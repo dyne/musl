@@ -76,6 +76,7 @@ jobs:
         run: |
           make -s -j`nproc`
           make -s install
+          make -C libs ARCH=${{ matrix.target }}
           cat README.md | awk '{gsub(/\[[^][]+\]\([^()]+\)/, gensub(/\[([^][]+)\]\([^()]+\)/, "\\1", "g")); print}' | fmt -w 72 > /opt/musl-dyne/README.txt
           echo "Compressing:  musl-dyne-${{ matrix.output }}.tar.xz"
           cd /opt && tar -cJf musl-dyne-${{ matrix.output }}.tar.xz musl-dyne
