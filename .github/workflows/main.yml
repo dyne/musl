@@ -80,6 +80,7 @@ jobs:
           make -C libs ARCH=${{ matrix.target }}
           rm -rf /opt/musl-dyne/share/man
           cat README.md | awk '{gsub(/\[[^][]+\]\([^()]+\)/, gensub(/\[([^][]+)\]\([^()]+\)/, "\\1", "g")); print}' | fmt -w 72 > /opt/musl-dyne/README.txt
+          cp settings.cmake /opt/musl-dyne/
           echo "Compressing:  musl-dyne-${{ matrix.output }}.tar.xz"
           cd /opt && tar -cJf musl-dyne-${{ matrix.output }}.tar.xz musl-dyne
       - name: Upload release artifacts musl-dyne-${{ matrix.output }}
