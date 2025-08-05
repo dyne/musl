@@ -76,11 +76,21 @@ jobs:
         run: |
           make -s -j`nproc`
           make -s install
-          rm -f /opt/musl-dyne/bin/*-lto-dump
           make -C libs ARCH=${{ matrix.target }}
+      - name: Strip and clean binaries
+        run: |
+          rm -f /opt/musl-dyne/bin/*-lto-dump
+          rm -f /opt/musl-dyne/${{ matrix.target }}/lib/*.py
+          find /opt/musl-dyne/bin /opt/musl-dyne/lib -type f -exec file {} \; | grep -E '(LSB exec|pie exec|shared obj|ar archive)' | cut -d: -f1 | xargs strip -g
+          find /opt/musl-dyne/${{ matrix.target }} -type f -exec file {} \; | grep -E '(LSB exec|pie exec|shared obj|ar archive)' | cut -d: -f1 | xargs /opt/musl-dyne/bin/${{ matrix.target }}-strip -g
           rm -rf /opt/musl-dyne/share/man
           cat README.md | awk '{gsub(/\[[^][]+\]\([^()]+\)/, gensub(/\[([^][]+)\]\([^()]+\)/, "\\1", "g")); print}' | fmt -w 72 > /opt/musl-dyne/README.txt
           cp settings.cmake /opt/musl-dyne/
+      - name: Compress the package
+        env:
+          XZ_OPT: -9e -T0
+          TARGET: ${{ matrix.target }}
+        run: |
           echo "Compressing:  musl-dyne-${{ matrix.output }}.tar.xz"
           cd /opt && tar -cJf musl-dyne-${{ matrix.output }}.tar.xz musl-dyne
       - name: Upload release artifacts musl-dyne-${{ matrix.output }}
