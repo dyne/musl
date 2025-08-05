@@ -59,7 +59,7 @@ $(T)/lib/libssh2.a: $(SSH2).orig
 $(T)/bin/ccache: $(CCACHE).orig
 	$(info Building CCACHE)
 	cd $(CCACHE).orig && \
-	cmake -G Ninja -S . -B build \
+	cmake -G Ninja -S . -B build -DARCH=${ARCH} \
 				-DCMAKE_TOOLCHAIN_FILE=${R}/settings.cmake -DCMAKE_INSTALL_PREFIX="${PREFIX}/${ARCH}" \
 				-DHTTP_STORAGE_BACKEND=OFF -DENABLE_TESTING=OFF -DREDIS_STORAGE_BACKEND=OFF \
 				-DSTATIC_LINK=ON -DCMAKE_EXE_LINKER_FLAGS="-static -static-libgcc -static-libstdc++" \

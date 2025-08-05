@@ -65,7 +65,7 @@ jobs:
       - uses: hendrikmuhs/ccache-action@v1.2
       - name: Install build deps
         run: |
-          sudo apt install -qy tree cmake make autoconf automake libtool gcc g++ ccache
+          sudo apt install -qy tree cmake make autoconf automake libtool gcc g++ ccache ninja-build
       - name: Downoad sources from files.dyne.org
         run: |
           cd sources && sh download_from_dyne.sh
