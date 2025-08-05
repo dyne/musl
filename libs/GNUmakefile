@@ -9,18 +9,20 @@ LIBSSL ?= libressl-4.1.0
 ZLIB ?= zlib-ng-2.2.4
 CURL ?= curl-8.15.0
 SSH2 ?= libssh2-1.11.1
+CCACHE ?= ccache-4.11.3
 
-# .PHONY: build-SSH2 build-CURL build-ZLIB build-LIBSSL
 
 CC := ccache $(PREFIX)/bin/$(ARCH)-gcc
 AR := $(PREFIX)/bin/$(ARCH)-ar
 T  := $(PREFIX)/$(ARCH)
+R  := $(shell dirname $(CURDIR))
 
 all: \
 	$(T)/lib/libssl.a  \
 	$(T)/lib/libz.a    \
 	$(T)/lib/libcurl.a \
-	$(T)/lib/libssh2.a
+	$(T)/lib/libssh2.a \
+	$(T)/bin/ccache
 
 $(T)/lib/libssl.a: $(LIBSSL).orig
 	$(info Building SSL library)
@@ -54,6 +56,15 @@ $(T)/lib/libssh2.a: $(SSH2).orig
 					--build=x86_64-linux-musl --host=$(ARCH) \
 		&& $(MAKE) -j`nproc` && $(MAKE) install
 
+$(T)/bin/ccache: $(CCACHE).orig
+	$(info Building CCACHE)
+	cd $(CCACHE).orig && \
+	cmake -G Ninja -S . -B build \
+				-DCMAKE_TOOLCHAIN_FILE=${R}/settings.cmake -DCMAKE_INSTALL_PREFIX="${PREFIX}/${ARCH}" \
+				-DHTTP_STORAGE_BACKEND=OFF -DENABLE_TESTING=OFF -DREDIS_STORAGE_BACKEND=OFF \
+				-DSTATIC_LINK=ON -DCMAKE_EXE_LINKER_FLAGS="-static -static-libgcc -static-libstdc++" \
+	&& ninja -C build && ninja -C build install
+
 # upstream: https://ftp.openbsd.org/pub/OpenBSD/LibreSSL/
 $(LIBSSL).tar.gz:
 	curl -L https://files.dyne.org/?file=musl/sources/$@ --output $@
@@ -68,6 +79,9 @@ $(CURL).tar.xz:
 
 # upstream: https://libssh2.org
 $(SSH2).tar.xz:
+	curl -L https://files.dyne.org/?file=musl/sources/$@ --output $@
+
+$(CCACHE).tar.xz:
 	curl -L https://files.dyne.org/?file=musl/sources/$@ --output $@
 
 clean:
