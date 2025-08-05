@@ -9,10 +9,10 @@ option(FOR_MUSL_DYNE "Install target will copy everything inside /opt/musl-dyne"
 option(FORCE_STATIC "Force linker flags to build static executables (may fix or break some cases)" 0)
 
 # No need to change anything below here
+set(PREFIX "/opt/musl-dyne")
 set(CMAKE_C_COMPILER "${PREFIX}/bin/${ARCH}-gcc")
 set(CMAKE_CXX_COMPILER "${PREFIX}/bin/${ARCH}-g++")
-
-set(PREFIX "/opt/musl-dyne")
+set(CMAKE_ASM_COMPILER "${PREFIX}/bin/${ARCH}-as")
 
 set(CMAKE_SYSROOT "${PREFIX}/${ARCH}")
 set(CMAKE_PREFIX_PATH "${PREFIX};${PREFIX}/${ARCH}")

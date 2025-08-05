@@ -26,11 +26,12 @@ all: \
 
 $(T)/lib/libssl.a: $(LIBSSL).orig
 	$(info Building SSL library)
-	mkdir -p $(LIBSSL).orig/build && cd $(LIBSSL).orig && \
-	cmake -G Ninja -S . -B build -DARCH=${ARCH} \
-	-DCMAKE_TOOLCHAIN_FILE=${R}/settings.cmake -DFOR_MUSL_DYNE=1 \
-		-DLIBRESSL_TESTS=0 -DENABLE_NC=1 \
-	&& ninja -C build && ninja -C build install
+	cd $(LIBSSL).orig \
+	&& CC="$(CC)" AR="$(AR)" \
+	CFLAGS="-static -g0 -Os -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow" \
+	./configure --prefix=$(PREFIX)/$(ARCH) --build=x86_64-linux-musl --host=$(ARCH) \
+		--disable-shared --disable-tests --disable-dependency-tracking \
+	&& $(MAKE) -j`nproc` && $(MAKE) install
 
 $(T)/lib/libz.a: $(ZLIB).orig
 	$(info Building Z library)
