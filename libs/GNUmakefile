@@ -26,43 +26,55 @@ all: \
 
 $(T)/lib/libssl.a: $(LIBSSL).orig
 	$(info Building SSL library)
-	cd $(LIBSSL).orig \
-		&& CC="$(CC)" AR=$(AR) CFLAGS="-static -g0 -Os" \
-			 ./configure --prefix=$(PREFIX)/$(ARCH) --disable-shared --disable-tests --disable-dependency-tracking --build=x86_64-linux-musl --host=$(ARCH) \
-		&& $(MAKE) -j`nproc` && $(MAKE) install
+	mkdir -p $(LIBSSL).orig/build && cd $(LIBSSL).orig && \
+	cmake -G Ninja -S . -B build -DARCH=${ARCH} \
+	-DCMAKE_TOOLCHAIN_FILE=${R}/settings.cmake -DFOR_MUSL_DYNE=1 \
+		-DLIBRESSL_TESTS=0 -DENABLE_NC=1 \
+	&& ninja -C build && ninja -C build install
 
 $(T)/lib/libz.a: $(ZLIB).orig
 	$(info Building Z library)
-	mkdir -p $(ZLIB).orig/build && cd $(ZLIB).orig/build \
-		&& CC=$(PREFIX)/bin/$(ARCH)-gcc AR=$(AR) CFLAGS="-static -g0 -Os" PKG_CONFIG_PATH=$(PREFIX)/lib/pkgconfig \
-			 cmake .. -DZLIB_ENABLE_TESTS=no -DZLIB_COMPAT=yes \
-								-DCMAKE_C_COMPILER=$(PREFIX)/bin/$(ARCH)-gcc -DCMAKE_C_COMPILER_LAUNCHER=ccache \
-			 					-DCMAKE_PREFIX_PATH=$(PREFIX)/$(ARCH) -DCMAKE_INSTALL_PREFIX=$(PREFIX)/$(ARCH) \
-							  -DZLIBNG_ENABLE_TESTS=no -DWITH_SANITIZER=no -DWITH_GTEST=no \
-		&& $(MAKE) -j`nproc` && $(MAKE) install
+	mkdir -p $(ZLIB).orig/build && cd $(ZLIB).orig && \
+	cmake -G Ninja -S . -B build -DARCH=${ARCH} \
+	-DCMAKE_TOOLCHAIN_FILE=${R}/settings.cmake -DFOR_MUSL_DYNE=1 \
+		-DZLIB_ENABLE_TESTS=0 -DZLIB_COMPAT=1 -DZLIBNG_ENABLE_TESTS=0 \
+		-DWITH_SANITIZER=0 -DWITH_GTEST=0 -DBUILD_SHARED_LIBS=0 \
+	&& ninja -C build && ninja -C build install
 
 $(T)/lib/libcurl.a: $(CURL).orig
 	$(info Building CURL library)
-	cd $(CURL).orig \
-		&& CC="$(CC)" AR=$(AR) CFLAGS="-static -g0 -Os" PKG_CONFIG_PATH=$(PREFIX)/lib/pkgconfig \
-			 ./configure --prefix=$(PREFIX)/$(ARCH) --disable-shared --with-zlib=$(PREFIX)/$(ARCH) --with-openssl --build=x86_64-linux-musl --host=$(ARCH) --with-sysroot=$(PREFIX)/$(ARCH) --without-libpsl --disable-docs \
-		&& $(MAKE) -j`nproc` && $(MAKE) install
+	mkdir -p $(CURL).orig/build && cd $(CURL).orig && \
+	cmake -G Ninja -S . -B build -DARCH=${ARCH} \
+	-DCMAKE_TOOLCHAIN_FILE=${R}/settings.cmake -DFOR_MUSL_DYNE=1 \
+		-DBUILD_SHARED_LIBS=0 -DBUILD_STATIC_LIBS=1 -DBUILD_STATIC_CURL=1 \
+		-DCURL_LTO=1 -DENABLE_THREADED_RESOLVER=1 -DCURL_USE_LIBPSL=0 \
+	  -DBUILD_LIBCURL_DOCS=0 -DBUILD_MISC_DOCS=0 -DENABLE_CURL_MANUAL=0 \
+		-DCURL_USE_OPENSSL=1 \
+	&& ninja -C build && ninja -C build install
 
 $(T)/lib/libssh2.a: $(SSH2).orig
 	$(info Building SSH2 library)
-	cd $(SSH2).orig \
-		&& CC="$(CC)" AR=$(AR) CFLAGS="-static -g0 -Os" PKG_CONFIG_PATH=$(PREFIX)/lib/pkgconfig \
-			 ./configure --prefix=$(PREFIX)/$(ARCH) --disable-shared --disable-tests --with-crypto=openssl --with-sysroot=$(PREFIX)  \
-					--build=x86_64-linux-musl --host=$(ARCH) \
-		&& $(MAKE) -j`nproc` && $(MAKE) install
+	mkdir -p $(SSH2).orig/build && cd $(SSH2).orig && \
+	cmake -G Ninja -S . -B build -DARCH=${ARCH} \
+	-DCMAKE_TOOLCHAIN_FILE=${R}/settings.cmake -DFOR_MUSL_DYNE=1 \
+		-DBUILD_SHARED_LIBS=0 -DBUILD_TESTING=0 -DBUILD_EXAMPLES=0 \
+		-DCRYPTO_BACKEND="OpenSSL" \
+	&& ninja -C build && ninja -C build install
 
+# && CC="$(CC)" AR=$(AR) CFLAGS="-static -g0 -Os" PKG_CONFIG_PATH=$(PREFIX)/lib/pkgconfig \
+# ./configure --prefix=$(PREFIX)/$(ARCH) --disable-shared --disable-tests --with-crypto=openssl --with-sysroot=$(PREFIX)  \
+# --build=x86_64-linux-musl --host=$(ARCH) \
+# && $(MAKE) -j`nproc` && $(MAKE) install
+
+# -DCMAKE_INSTALL_PREFIX="${PREFIX}/${ARCH}"
 $(T)/bin/ccache: $(CCACHE).orig
 	$(info Building CCACHE)
-	cd $(CCACHE).orig && \
+	mkdir -p $(CCACHE).orig/build && cd $(CCACHE).orig && \
 	cmake -G Ninja -S . -B build -DARCH=${ARCH} \
-				-DCMAKE_TOOLCHAIN_FILE=${R}/settings.cmake -DCMAKE_INSTALL_PREFIX="${PREFIX}/${ARCH}" \
-				-DHTTP_STORAGE_BACKEND=OFF -DENABLE_TESTING=OFF -DREDIS_STORAGE_BACKEND=OFF \
-				-DSTATIC_LINK=ON -DCMAKE_EXE_LINKER_FLAGS="-static -static-libgcc -static-libstdc++" \
+  -DCMAKE_TOOLCHAIN_FILE=${R}/settings.cmake -DFOR_MUSL_DYNE=1 \
+		-DFORCE_STATIC=1 \
+		-DHTTP_STORAGE_BACKEND=OFF -DENABLE_TESTING=OFF \
+		-DREDIS_STORAGE_BACKEND=OFF -DSTATIC_LINK=ON \
 	&& ninja -C build && ninja -C build install
 
 # upstream: https://ftp.openbsd.org/pub/OpenBSD/LibreSSL/
@@ -87,10 +99,12 @@ $(CCACHE).tar.xz:
 clean:
 	rm -rf *.orig
 	rm -f \
-		$(T)/lib/libssl.a  \
-		$(T)/lib/libz.a    \
-		$(T)/lib/libcurl.a \
-		$(T)/lib/libssh2.a
+		$(T)/lib/libssl.*    \
+		$(T)/lib/libcrypto.* \
+		$(T)/lib/libz.*    \
+		$(T)/lib/libcurl.* \
+		$(T)/lib/libssh2.* \
+		$(T)/bin/ccache
 
 %.orig: %.tar.gz
 	tar zxf - < $<
