@@ -146,7 +146,7 @@ jobs:
 
   draft-binary-release:
     name: 📦 Pack release
-    needs: [semantic-release, linux-release, alpine-release]
+    needs: [semantic-release, linux-release]
     runs-on: ubuntu-latest
     steps:
       - name: download binary artifacts
@@ -195,7 +195,7 @@ jobs:
 
   remove-tag-on-fail:
     name: 🧻 Remove tag on fail
-    needs: [semantic-release, linux-release, alpine-release]
+    needs: [semantic-release, linux-release]
     runs-on: ubuntu-latest
     if: ${{ (failure() || cancelled()) && needs.semantic-release.outputs.new_release_published == 'True' }}
     steps:
