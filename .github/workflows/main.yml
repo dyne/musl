@@ -65,7 +65,7 @@ jobs:
       - uses: hendrikmuhs/ccache-action@v1.2
       - name: Build chroot ${{ matrix.target }}
         run: |
-          make chroot
+          sudo make chroot
           echo "export ARCH=\"${{ matrix.target }}\"" | sudo tee /alpine/etc/profile
       - name: Build gcc-musl ${{ matrix.target }}
         run: |
