@@ -40,10 +40,20 @@ The latest build is made with:
 - mpfr-4.0.2.tar.bz2
 - musl-1.2.5.tar.gz
 
+plus additional base libs and utils:
+
+- libressl-4.1.0
+- zlib-ng-2.2.4
+- curl-8.15.0
+- libssh2-1.11.1
+- ccache-4.11.3
+
 Build flags used: `--disable-nls --disable-libmudflap
---disable-libsanitizer`.  We omit debugging functions, but we enable
-decimal-float, fixed-point, quadmath and lto, as well libitm to
-satisfy advanced C++ requirements.
+--disable-libsanitizer`. Features enabled: decimal-float, fixed-point,
+quadmath and lto, as well libitm to satisfy advanced C++ requirements.
+Debugging functions are omitted.
+
+
 
 Builds are fully automated over CI and use semantic versioning that is
 specific to dyne/musl and unrelated to gcc or musl release versions.

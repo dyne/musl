@@ -1,5 +1,5 @@
 {
-  "repositoryUrl": "git@github.com:dyne/musl-dyne.git",
+  "repositoryUrl": "git@github.com:dyne/musl.git",
   "plugins": [
     "@semantic-release/commit-analyzer",
     "@semantic-release/release-notes-generator",

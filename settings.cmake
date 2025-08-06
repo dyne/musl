@@ -2,20 +2,23 @@
 
 # Configurable settings
 set(ARCH "x86_64-linux-musl" CACHE STRING "Target architecture to (cross)compile")
-set(CMAKE_CXX_FLAGS "-static -g0 -Os -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow" CACHE STRING "C++ Compilation flags, default set for small and secure binaries")
-set(CMAKE_C_FLAGS "-static -g0 -Os -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow" CACHE STRING "C Compilation flags, default set for small and secure binaries")
+set(CMAKE_CXX_FLAGS "-static --static -g0 -Os -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow" CACHE STRING "C++ Compilation flags, default set for small and secure binaries")
+set(CMAKE_C_FLAGS "-static --static -g0 -Os -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow" CACHE STRING "C Compilation flags, default set for small and secure binaries")
+set(ROOT "/opt" CACHE STRING "Base root prefix for installation (often referred as PREFIX or DESTDIR)")
 option(CCACHE "Use ccache to speed up compilation" 1)
 option(FOR_MUSL_DYNE "Install target will copy everything inside /opt/musl-dyne" 0)
 option(FORCE_STATIC "Force linker flags to build static executables (may fix or break some cases)" 0)
 
+set(R "${CMAKE_CURRENT_SOURCE_DIR}")
+
 # No need to change anything below here
-set(PREFIX "/opt/musl-dyne")
-set(CMAKE_C_COMPILER "${PREFIX}/bin/${ARCH}-gcc")
-set(CMAKE_CXX_COMPILER "${PREFIX}/bin/${ARCH}-g++")
-set(CMAKE_ASM_COMPILER "${PREFIX}/bin/${ARCH}-as")
+set(PREFIX "${ROOT}/dyne")
+set(CMAKE_C_COMPILER   "${PREFIX}/gcc-musl/bin/${ARCH}-gcc")
+set(CMAKE_CXX_COMPILER "${PREFIX}/gcc-musl/bin/${ARCH}-g++")
+set(CMAKE_ASM_COMPILER "${PREFIX}/gcc-musl/bin/${ARCH}-as")
 
 set(CMAKE_SYSROOT "${PREFIX}/${ARCH}")
-set(CMAKE_PREFIX_PATH "${PREFIX};${PREFIX}/${ARCH}")
+set(CMAKE_PREFIX_PATH "${PREFIX}/gcc-musl;${PREFIX}/${ARCH}")
 include_directories(SYSTEM "${PREFIX}/${ARCH}/include")
 
 # Remove flags added by build type
@@ -46,9 +49,10 @@ if(CCACHE)
   echo("💪 Using CCACHE to speed up build")
 endif()
 
-if(FOR_MUSL_DYNE)
-  set(CMAKE_INSTALL_PREFIX "${PREFIX}/${ARCH}" CACHE PATH "Install path")
-  echo("💪 Building to install inside /opt/musl-dyne")
+if(MUSL_DYNE)
+  set(CMAKE_INSTALL_PREFIX "${R}/dyne/${ARCH}")
+  include_directories(SYSTEM "${R}/dyne/${ARCH}/include")
+  echo("💪 Building to install inside dyne/${ARCH}")
 endif()
 
 if(FORCE_STATIC)
