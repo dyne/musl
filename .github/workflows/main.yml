@@ -63,36 +63,26 @@ jobs:
         with:
           fetch-depth: 0
       - uses: hendrikmuhs/ccache-action@v1.2
-      - name: Install build deps
+      - name: Build chroot ${{ matrix.target }}
         run: |
-          sudo apt install -qy tree cmake make autoconf automake libtool gcc g++ ccache ninja-build
-      - name: Downoad sources from files.dyne.org
+          make chroot
+          echo "export ARCH=\"${{ matrix.target }}\"" | sudo tee /alpine/etc/profile
+      - name: Build gcc-musl ${{ matrix.target }}
         run: |
-          cd sources && sh download_from_dyne.sh
-      - name: Build ${{ matrix.target }}
-        env:
-          XZ_OPT: -9e -T0
-          TARGET: ${{ matrix.target }}
+          /alpine/enter-chroot make gcc
+      - name: Build libs ${{ matrix.target }}
         run: |
-          make -s -j`nproc`
-          make -s install
-          make -C libs ARCH=${{ matrix.target }}
-      - name: Strip and clean binaries
+          /alpine/enter-chroot make libs
+      - name: Prepare ${{ matrix.target }}
         run: |
-          rm -f /opt/musl-dyne/bin/*-lto-dump
-          rm -f /opt/musl-dyne/${{ matrix.target }}/lib/*.py
-          find /opt/musl-dyne/bin /opt/musl-dyne/lib -type f -exec file {} \; | grep -E '(LSB exec|pie exec|shared obj|ar archive)' | cut -d: -f1 | xargs strip -g
-          find /opt/musl-dyne/${{ matrix.target }} -type f -exec file {} \; | grep -E '(LSB exec|pie exec|shared obj|ar archive)' | cut -d: -f1 | xargs /opt/musl-dyne/bin/${{ matrix.target }}-strip -g
-          rm -rf /opt/musl-dyne/share/man
-          cat README.md | awk '{gsub(/\[[^][]+\]\([^()]+\)/, gensub(/\[([^][]+)\]\([^()]+\)/, "\\1", "g")); print}' | fmt -w 72 > /opt/musl-dyne/README.txt
-          cp settings.cmake /opt/musl-dyne/
+          /alpine/enter-chroot make prepare
       - name: Compress the package
         env:
           XZ_OPT: -9e -T0
           TARGET: ${{ matrix.target }}
         run: |
           echo "Compressing:  musl-dyne-${{ matrix.output }}.tar.xz"
-          cd /opt && tar -cJf musl-dyne-${{ matrix.output }}.tar.xz musl-dyne
+          tar -cJf musl-dyne-${{ matrix.output }}.tar.xz dyne
       - name: Upload release artifacts musl-dyne-${{ matrix.output }}
         uses: actions/upload-artifact@v4
         with:
@@ -100,59 +90,59 @@ jobs:
           path: |
             /opt/musl-dyne-${{ matrix.output }}.tar.xz
 
-  alpine-release:
-    name: 🗻 Alpine build
-    runs-on: ubuntu-latest
-    needs: [semantic-release]
-    if: ${{ needs.semantic-release.outputs.new_release_published == 'true' }}
-    strategy:
-      matrix:
-        include:
-          - target: arm-linux-musleabihf
-            output: arm_hf
-          - target: riscv64-linux-musl
-            output: riscv_64
-          - target: aarch64-linux-musl
-            output: arm_64
-    steps:
-      - uses: actions/checkout@v4
-      - name: Setup latest Alpine Linux
-        uses: jirutka/setup-alpine@v1
-        with:
-          volumes: /opt
-          packages: >-
-            bash
-            make
-            gcc
-            build-base
-            curl
-            patch
-            gawk
-            ccache
-            perl
-            rsync
-            xz
-      - name: Download sources inside Alpine chroot
-        run: |
-          ls -la
-          cd sources && sh download_from_dyne.sh
-        shell: alpine.sh {0}
-      - name: Build musl-dyne inside Alpine chroot
-        env:
-          XZ_OPT: -9e -T0
-          TARGET: ${{ matrix.target }}
-        shell: alpine.sh --root {0}
-        run: |
-          make -j`nproc`
-          make install
-          echo "Compressing:  cross-alpine-${{ matrix.output }}.tar.xz"
-          cd /opt && tar -cJf cross-alpine-${{ matrix.output }}.tar.xz musl-dyne
-      - name: Upload release artifacts cross-alpine-${{ matrix.output }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: alpine-${{ matrix.output }}
-          path: |
-            /opt/cross-alpine-${{ matrix.output }}.tar.xz
+  # alpine-release:
+  #   name: 🗻 Alpine build
+  #   runs-on: ubuntu-latest
+  #   needs: [semantic-release]
+  #   if: ${{ needs.semantic-release.outputs.new_release_published == 'true' }}
+  #   strategy:
+  #     matrix:
+  #       include:
+  #         - target: arm-linux-musleabihf
+  #           output: arm_hf
+  #         - target: riscv64-linux-musl
+  #           output: riscv_64
+  #         - target: aarch64-linux-musl
+  #           output: arm_64
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - name: Setup latest Alpine Linux
+  #       uses: jirutka/setup-alpine@v1
+  #       with:
+  #         volumes: /opt
+  #         packages: >-
+  #           bash
+  #           make
+  #           gcc
+  #           build-base
+  #           curl
+  #           patch
+  #           gawk
+  #           ccache
+  #           perl
+  #           rsync
+  #           xz
+  #     - name: Download sources inside Alpine chroot
+  #       run: |
+  #         ls -la
+  #         cd sources && sh download_from_dyne.sh
+  #       shell: alpine.sh {0}
+  #     - name: Build musl-dyne inside Alpine chroot
+  #       env:
+  #         XZ_OPT: -9e -T0
+  #         TARGET: ${{ matrix.target }}
+  #       shell: alpine.sh --root {0}
+  #       run: |
+  #         make -j`nproc`
+  #         make install
+  #         echo "Compressing:  cross-alpine-${{ matrix.output }}.tar.xz"
+  #         cd /opt && tar -cJf cross-alpine-${{ matrix.output }}.tar.xz musl-dyne
+  #     - name: Upload release artifacts cross-alpine-${{ matrix.output }}
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: alpine-${{ matrix.output }}
+  #         path: |
+  #           /opt/cross-alpine-${{ matrix.output }}.tar.xz
 
   draft-binary-release:
     name: 📦 Pack release
@@ -184,9 +174,6 @@ jobs:
             musl-dyne/release-arm_hf/musl-dyne-arm_hf.tar.xz,
             musl-dyne/release-arm_64/musl-dyne-arm_64.tar.xz,
             musl-dyne/release-riscv_64/musl-dyne-riscv_64.tar.xz,
-            musl-dyne/alpine-arm_hf/cross-alpine-arm_hf.tar.xz,
-            musl-dyne/alpine-arm_64/cross-alpine-arm_64.tar.xz,
-            musl-dyne/alpine-riscv_64/cross-alpine-riscv_64.tar.xz,
             musl-dyne/checksums/SHA256SUMS.txt
           target: |
             /srv/ftp/musl
@@ -197,7 +184,6 @@ jobs:
         with:
           files: |
             musl-dyne/release-*/*
-            musl-dyne/alpine-*/*
             musl-dyne/checksums/SHA256SUMS.txt
           tag_name: ${{ needs.semantic-release.outputs.new_release_version }}
           #body_path: musl-dyne/documentation/release-intro.md

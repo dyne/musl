@@ -1,11 +1,15 @@
 ARCH ?= x86_64-linux-musl
 
-all: gcc libs strip
+all: gcc libs
+	$(info Build completed!)
+	$(MAKE) prepare
 
 chroot: /alpine/enter-chroot
 
 gcc: dyne/gcc-musl/bin/$(ARCH)-gcc
 libs: dyne/$(ARCH)/lib/libssl.a
+prepare:
+	sh prepare.sh $(ARCH)
 
 /alpine/enter-chroot:
 	./alpine-chroot-install -a x86_64 -d /alpine \
@@ -19,11 +23,6 @@ dyne/gcc-musl/bin/$(ARCH)-gcc:
 dyne/$(ARCH)/lib/libssl.a:
 	$(MAKE) -C libs         ARCH=$(ARCH) PREFIX=$(CURDIR)/dyne/$(ARCH)
 
-strip:
-	rm -f dyne/bin/*-lto-dump
-	rm -rf dyne/share
-	cat README.md | awk '{gsub(/\[[^][]+\]\([^()]+\)/, gensub(/\[([^][]+)\]\([^()]+\)/, "\\1", "g")); print}' | fmt -w 72 | tee dyne/$(ARCH)/README.txt > dyne/gcc-musl/README.txt
-	cp settings.cmake dyne/gcc-musl
 
 clean:
 	rm -rf dyne
