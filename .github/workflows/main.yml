@@ -51,11 +51,17 @@ jobs:
           - target: aarch64-linux-musl
             output: arm_64
       fail-fast: true
+    env:
+      CCACHE_DIR: /alpine/root/.cache/ccache
+      XZ_OPT: -9e -T0
+      TARGET: ${{ matrix.target }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: ccache
+        uses: hendrikmuhs/ccache-action@v1.2
       - name: Build chroot ${{ matrix.target }}
         run: |
           sudo make chroot
@@ -70,9 +76,6 @@ jobs:
         run: |
           /alpine/enter-chroot make prepare
       - name: Compress the package
-        env:
-          XZ_OPT: -9e -T0
-          TARGET: ${{ matrix.target }}
         run: |
           echo "Compressing:  dyne-gcc-musl-${{ matrix.output }}.tar.xz"
           tar -cJf dyne-gcc-musl-${{ matrix.output }}.tar.xz dyne
