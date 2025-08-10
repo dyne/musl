@@ -16,7 +16,7 @@ libs: dyne/$(ARCH)/lib/libssl.a
 prepare:
 	sh prepare.sh $(ARCH)
 
-/alpine/enter-chroot: APKS := bash make cmake gcc build-base curl patch gawk ccache perl rsync xz samurai coreutils-fmt
+/alpine/enter-chroot: APKS := bash make cmake gcc build-base musl-dev curl patch gawk ccache perl rsync xz samurai coreutils-fmt
 /alpine/enter-chroot:
 	$(info 💪 Alpine chroot packages: $(APKS))
 	./alpine-chroot-install -a x86_64 -d /alpine -p "$(APKS)"

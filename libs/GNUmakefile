@@ -15,8 +15,8 @@ R  := $(shell dirname $(CURDIR))
 T  := $(R)/dyne/$(ARCH)
 
 GCC_BINS := $(R)/dyne/gcc-musl/bin/$(ARCH)
-CC  := ccache $(GCC_BINS)-gcc
-CXX := ccache $(GCC_BINS)-g++
+CC  := ccache $(GCC_BINS)-gcc --static
+CXX := ccache $(GCC_BINS)-g++ --static
 ASM := $(GCC_BINS)-as
 AR := $(GCC_BINS)-ar
 

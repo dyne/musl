@@ -81,6 +81,16 @@ musl-cross-make's patch set provides:
 - Support for J2 Core CPU target in GCC & binutils
 - SH/FDPIC ABI support
 
+## Build it yourself
+
+In order to build a static toolchain, we use Alpine in a chroot with bind-mount of current dir and therefore require super-user privileges.
+
+The sequence of commands to build is:
+1. `sudo make chroot`
+2. `/alpine/enter-chroot make gcc`
+3. `/alpine/enter-chroot make libs`
+
+Assuming you are building in `/home/user/devel/musl` then the built toolchain will be found in `/opt/alpine/home/user/devel/musl/dyne`.
 
 ## License
 
