@@ -8,6 +8,9 @@ rm -f dyne/bin/*-lto-dump
 rm -rf dyne/share
 rm -f dyne/${1}/lib/*.py
 
+find dyne/gcc-musl/x86_64-linux-musl/lib -name '*.so*' | cut -d: -f1 | xargs rm -f
+find dyne/gcc-musl/x86_64-linux-musl/lib -name '*.la*' | cut -d: -f1 | xargs rm -f
+
 find dyne/gcc-musl/bin dyne/gcc-musl/lib -type f -exec file {} + \
 | grep -E '(LSB exec|pie exec|shared obj|ar archive)' | cut -d: -f1 \
 | xargs strip -g

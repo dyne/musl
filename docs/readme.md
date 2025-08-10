@@ -10,6 +10,11 @@ We enable bare-metal as well virtualized **builds of static binaries that run ev
 
 ## Usage
 
+Download and install in one line of shell:
+```
+curl -L 'https://files.dyne.org/?file=musl/dyne-gcc-musl-x86_64.tar.xz' | tar -C /opt -xJf -
+```
+
 The hard-coded absolute path this toolchain resides is: `/opt/dyne/gcc-musl`
 
 One should therefore include `/opt/dyne/gcc-musl/bin` in $PATH:
@@ -17,8 +22,18 @@ One should therefore include `/opt/dyne/gcc-musl/bin` in $PATH:
 export PATH=/opt/dyne/gcc-musl/bin:$PATH
 ```
 
-Look inside the bin directory for the list of executable compiler
-tools and setup `CC`, `CXX`, `LD` and `AR` flags accordingly for each build system used by your projects.
+Look inside the bin directory for the list of executable compiler tools and setup `CC`, `CXX`, `LD` and `AR` flags accordingly for each build system used by your projects. For example:
+```sh
+export ARCH="x86_64-linux-musl"
+export CFLAGS="-I/opt/dyne/${ARCH}/include -Os ${CFLAGS}
+export CXXFLAGS="${CFLAGS}"
+export LDFLAGS="-static -L/opt/dyne/${ARCH}/lib ${LDFLAGS}"
+export CC="/opt/dyne/gcc-musl/bin/${ARCH}-gcc"
+export CXX="/opt/dyne/gcc-musl/bin/${ARCH}-g++"
+export AR="/opt/dyne/gcc-musl/bin/${ARCH}-ar"
+export AS="/opt/dyne/gcc-musl/bin/${ARCH}-as"
+export PKG_CONFIG_PATH="/opt/dyne/${ARCH}/lib/pkgconfig"
+```
 
 We also ship base libraries commonly used in C/C++ applications: **libreSSL, ZLib-ng, libSSH2 and libCURL**, as well ccache to speed compilation. There are found in `/opt/dyne/$ARCH` where `$ARCH` is the targetes architecture that must be installed. Multiple target architectures can be installed and coexist in `/opt/dyne`.
 
