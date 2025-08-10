@@ -15,7 +15,6 @@ export default defineConfig({
     },
     nav: [
       { text: "Home", link: "/" },
-      { text: "Readme", link: "/readme" },
       { text: "Releases", link: "https://files.dyne.org/?dir=musl" },
     ],
     socialLinks: [

@@ -5,3 +5,8 @@
 :root:not(.dark) img {
     filter: invert(0);
 }
+
+.spacer {
+    height: 4rem;
+    width: 100%;
+}

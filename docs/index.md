@@ -5,39 +5,34 @@ layout: home
 hero:
   name: "C / C++ toolchains"
   text: "For static builds."
-  tagline: Direct downloads ~50 MB each<br/>Extract into /opt/musl-dyne
+  tagline: "Direct downloads ~50 MB each<br/>Extract into /opt/dyne, works in any distro."
   image:
     src: musl-logo-infinity-optimized.svg
     alt: Hands-on, Dyne.org style
   actions:
-    - theme: brand
-      text: X86 64‑bit
-      link: 'https://files.dyne.org/?dir=musl'
-    - theme: brand
-      text: ARM HF 32‑bit
-      link: 'https://files.dyne.org/?dir=musl'
-    - theme: brand
-      text: ARM 64‑bit
-      link: 'https://files.dyne.org/?dir=musl'
-    - theme: brand
-      text: RISC‑V 64‑bit
+    - thene: sponsor
+      text: "📥 DOWNLOAD: X86 64‑bit, ARM HF 32‑bit, ARM 64‑bit, RISC‑V 64‑bit"
       link: 'https://files.dyne.org/?dir=musl'
 
 features:
   - title: 👟 Zero dependencies
-    details: Produce static ELF binaries that run on any Linux distribution
+    details: Produce static ELF binaries that run on any GNU/Linux distribution and are free to be redistributed.
 
   - title: 🚀 GCC 15.1 / Binutils 2.44
-    details: Built with recent GNU tools and musl-libc releases
+    details: Built with recent GNU tools and musl-libc releases, libreSSL, ZLib-ng, libCURL, etc.
 
   - title: 🤏 Optimized for size
-    details: Stripped and compiled with -Os to fit anywhere
+    details: Stripped and compiled with -Os to fit anywhere and produce the smallest binaries possible.
 
   - title: 🦾 Latest C++ support
-    details: Includes libstdc++ and libatomic for modern C++20 builds
+    details: Includes libstdc++ and libatomic to support modern C++17 and C++20 code.
 
 
 ---
+
+<div class="spacer"></div>
+
+<!--@include:readme.md-->
 
 <!--
 <p>&nbsp;</p>

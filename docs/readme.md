@@ -1,58 +1,54 @@
-# GNU / musl compilers by Dyne.org
+# 💪 GNU / musl compilers by Dyne.org
 
 ## Introduction
 
-This is a pre-built cross-compilation toolchain that combine the GNU
-compiler collection (GCC with Binutils, GMP, MPC and MPFR) with the
-musl C library. Pronounced "muscl", our C/C++ compiler packages are
-optimized to be small in size and produce static binaries,
-redistributed by the Dyne.org foundation.
+This is a **fully static**, pre-built cross-compilation toolchain for x86_64 Linux hosts (any, including WSL2 and Alpine) that combines the GNU compiler collection (GCC with Binutils, GMP, MPC and MPFR) with the musl C library (pronounced "muscle").
 
-Our goal is to provide x86 64-bit Linux hosts (including WSL2) with
-ready to use cross-compilers that build static binaries for different
-architectures without installing additional system packages or
-fighting with distribution-specific patches.
+Our C/C++ toolchain is optimized to be small in size, produce static binaries, and **support the latest C++20 standard** and be updated for future versions.
+
+We enable bare-metal as well virtualized **builds of static binaries that run everywhere**, without installing additional system packages, chroots, docker images, qemu or dealing with distribution-specific patches.
 
 ## Usage
 
-The hard-coded absolute path this toolchain resides is: `/opt/musl-dyne`
+The hard-coded absolute path this toolchain resides is: `/opt/dyne/gcc-musl`
 
-One should therefore include `/opt/musl-dyne/bin` in $PATH:
+One should therefore include `/opt/dyne/gcc-musl/bin` in $PATH:
 ```sh
-export PATH=/opt/musl-dyne/bin:$PATH
+export PATH=/opt/dyne/gcc-musl/bin:$PATH
 ```
 
 Look inside the bin directory for the list of executable compiler
-tools and setup `CC`, `CXX` and `LD` flags accordingly for each build
-system used by your projects.
+tools and setup `CC`, `CXX`, `LD` and `AR` flags accordingly for each build system used by your projects.
+
+We also ship base libraries commonly used in C/C++ applications: **libreSSL, ZLib-ng, libSSH2 and libCURL**, as well ccache to speed compilation. There are found in `/opt/dyne/$ARCH` where `$ARCH` is the targetes architecture that must be installed. Multiple target architectures can be installed and coexist in `/opt/dyne`.
+
+### Easy use in CMake
+
+If you are using `cmake` for your builds then use our toolchain file:
+```sh
+-DCMAKE_TOOLCHAIN_FILE="/opt/dyne/gcc-musl/settings.cmake"
+```
+Make sure to config `-DARCH=""` to your target architecture, here a list of all configurable options and their defaults:
+```cmake
+# Configurable settings
+set(ARCH "x86_64-linux-musl" CACHE STRING "Target architecture to (cross)compile")
+set(CMAKE_CXX_FLAGS "-static --static -g0 -Os -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow" CACHE STRING "C++ Compilation flags, default set for small and secure binaries")
+set(CMAKE_C_FLAGS "-static --static -g0 -Os -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow" CACHE STRING "C Compilation flags, default set for small and secure binaries")
+set(ROOT "/opt" CACHE STRING "Base root prefix for installation (often referred as PREFIX or DESTDIR)")
+option(CCACHE "Use ccache to speed up compilation" 1)
+option(FOR_MUSL_DYNE "Install target will copy everything inside /opt/musl-dyne" 0)
+option(FORCE_STATIC "Force linker flags to build static executables (may fix or break some cases)" 0)
+```
 
 ## Source components
 
 All sources are mirrored on [files.dyne.org](https://files.dyne.org/musl?dir=musl/sources)
 
-The latest build is made with:
+The latest build includes the following source components: `binutils-2.44.tar.gz`, `gcc-15.1.0.tar.xz`, `gmp-6.1.2.tar.bz2`, `linux-5.8.5.tar.xz`, `mpc-1.1.0.tar.gz`, `mpfr-4.0.2.tar.bz2`, and `musl-1.2.5.tar.gz`.
 
-- binutils-2.44.tar.gz
-- gcc-15.1.0.tar.xz
-- gmp-6.1.2.tar.bz2
-- linux-5.8.5.tar.xz
-- mpc-1.1.0.tar.gz
-- mpfr-4.0.2.tar.bz2
-- musl-1.2.5.tar.gz
+Additional base libraries and utilities provided are `libressl-4.1.0`, `zlib-ng-2.2.4`, `curl-8.15.0`, `libssh2-1.11.1`, and `ccache-4.11.3`.
 
-plus additional base libs and utils:
-
-- libressl-4.1.0
-- zlib-ng-2.2.4
-- curl-8.15.0
-- libssh2-1.11.1
-- ccache-4.11.3
-
-Build flags used: `--disable-nls --disable-libmudflap
---disable-libsanitizer`. Features enabled: decimal-float, fixed-point,
-quadmath and lto, as well libitm to satisfy advanced C++ requirements.
-Debugging functions are omitted.
-
+Build flags used: `--disable-nls --disable-libmudflap --disable-libsanitizer --disable-lto`. Features enabled: decimal-float, fixed-point, quadmath, as well libitm to satisfy advanced C++ requirements. Debugging functions are omitted.
 
 
 Builds are fully automated over CI and use semantic versioning that is
@@ -70,20 +66,9 @@ following architectures:
 | ARM HF 32-bit | arm_hf      | `arm-linux-musleabihf` |
 | RISC-V 64-bit | riscv_64    | `riscv64-linux-musl`   |
 
-More target may be available in the future, get in touch with us if
-you need:
+More target may be available in the future, [get in touch with us](mailto:info@dyne.org) if you need:
 
-- `aarch64[_be]-linux-musl`
-- `i*86-linux-musl`
-- `microblaze[el]-linux-musl`
-- `mips-linux-musl`
-- `mips[el]-linux-musl[sf]`
-- `mips64[el]-linux-musl[n32][sf]`
-- `powerpc-linux-musl[sf]`
-- `powerpc64[le]-linux-musl`
-- `s390x-linux-musl`
-- `sh*[eb]-linux-musl[fdpic][sf]`
-- `x86_64-linux-musl[x32]`
+Supported architectures include: `aarch64[_be]-linux-musl`, `i*86-linux-musl`, `microblaze[el]-linux-musl`, `mips-linux-musl`, `mips[el]-linux-musl[sf]`, `mips64[el]-linux-musl[n32][sf]`, `powerpc-linux-musl[sf]`, `powerpc64[le]-linux-musl`, `s390x-linux-musl`, `sh*[eb]-linux-musl[fdpic][sf]`, and `x86_64-linux-musl[x32]`.
 
 ## Patches included
 
