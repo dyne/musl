@@ -2,7 +2,7 @@ import { defineConfig } from "vitepress";
 
 export default defineConfig({
   base: "/musl/",
-  title: "GNU / musl compilers by Dyne.org (pronounced \"muscl\")",
+  title: "GNU / musl compilers by Dyne.org",
   description: "C/C++ toolchains ready to use",
   build: {
     sourcemap: false,
@@ -15,7 +15,7 @@ export default defineConfig({
     },
     nav: [
       { text: "Home", link: "/" },
-      { text: "Releases", link: "https://files.dyne.org/?dir=musl" },
+      { text: "Downloads", link: "https://files.dyne.org/?dir=musl" },
     ],
     socialLinks: [
       { icon: "github", link: "https://github.com/dyne/musl" },
