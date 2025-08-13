@@ -1,4 +1,4 @@
-# 💪 GNU / musl compilers by Dyne.org
+# 💪 GNU / musl compilers
 
 ## Introduction
 
@@ -12,7 +12,7 @@ We enable bare-metal as well virtualized **builds of static binaries that run ev
 
 Download and install in one line of shell:
 ```
-curl -L 'https://files.dyne.org/?file=musl/dyne-gcc-musl-x86_64.tar.xz' | tar -C /opt -xJf -
+curl -L dl.dyne.org/musl | sudo tar -C /opt -xJf -
 ```
 
 The hard-coded absolute path this toolchain resides is: `/opt/dyne/gcc-musl`
@@ -35,7 +35,7 @@ export AS="/opt/dyne/gcc-musl/bin/${ARCH}-as"
 export PKG_CONFIG_PATH="/opt/dyne/${ARCH}/lib/pkgconfig"
 ```
 
-We also ship base libraries commonly used in C/C++ applications: **libreSSL, ZLib-ng, libSSH2 and libCURL**, as well ccache to speed compilation. There are found in `/opt/dyne/$ARCH` where `$ARCH` is the targetes architecture that must be installed. Multiple target architectures can be installed and coexist in `/opt/dyne`.
+We also ship base libraries commonly used in C/C++ applications: **libreSSL, ZLib-ng, libSSH2 and libCURL**, as well ccache to speed compilation. There are found in `/opt/dyne/$ARCH` where `$ARCH` (default x86_64) is the target architecture that must be installed. Multiple target architectures can be installed and coexist in `/opt/dyne`.
 
 ### Easy use in CMake
 
@@ -65,7 +65,6 @@ Additional base libraries and utilities provided are `libressl-4.1.0`, `zlib-ng-
 
 Build flags used: `--disable-nls --disable-libmudflap --disable-libsanitizer --disable-lto`. Features enabled: decimal-float, fixed-point, quadmath, as well libitm to satisfy advanced C++ requirements. Debugging functions are omitted.
 
-
 Builds are fully automated over CI and use semantic versioning that is
 specific to dyne/musl and unrelated to gcc or musl release versions.
 
@@ -81,9 +80,7 @@ following architectures:
 | ARM HF 32-bit | arm_hf      | `arm-linux-musleabihf` |
 | RISC-V 64-bit | riscv_64    | `riscv64-linux-musl`   |
 
-More target may be available in the future, [get in touch with us](mailto:info@dyne.org) if you need:
-
-Supported architectures include: `aarch64[_be]-linux-musl`, `i*86-linux-musl`, `microblaze[el]-linux-musl`, `mips-linux-musl`, `mips[el]-linux-musl[sf]`, `mips64[el]-linux-musl[n32][sf]`, `powerpc-linux-musl[sf]`, `powerpc64[le]-linux-musl`, `s390x-linux-musl`, `sh*[eb]-linux-musl[fdpic][sf]`, and `x86_64-linux-musl[x32]`.
+More architecture targets are available, [get in touch with us](mailto:info@dyne.org) if you need.
 
 ## Patches included
 
@@ -105,7 +102,7 @@ The sequence of commands to build is:
 2. `/alpine/enter-chroot make gcc`
 3. `/alpine/enter-chroot make libs`
 
-Assuming you are building in `/home/user/devel/musl` then the built toolchain will be found in `/opt/alpine/home/user/devel/musl/dyne`.
+Assuming you are building in */home/user/devel/musl* then the built toolchain will be found at the same path inside the chroot, for example in /opt/alpine*/home/user/devel/musl/dyne*.
 
 ## License
 

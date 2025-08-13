@@ -10,8 +10,8 @@ hero:
     src: musl-logo-infinity-optimized.svg
     alt: Hands-on, Dyne.org style
   actions:
-    - thene: sponsor
-      text: "📥 DOWNLOAD: X86 64‑bit, ARM HF 32‑bit, ARM 64‑bit, RISC‑V 64‑bit"
+    - theme: sponsor
+      text: "📥 FREE DOWNLOADS"
       link: 'https://files.dyne.org/?dir=musl'
 
 features:
