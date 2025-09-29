@@ -89,7 +89,7 @@ $(T)/bin/cmake: $(CMAKE).orig
 	cmake -G Ninja -S . -B build -DARCH=${ARCH} -DROOT="$(R)" \
 	-DCMAKE_TOOLCHAIN_FILE="${R}/settings.cmake" -DCMAKE_INSTALL_PREFIX="${R}/dyne/${ARCH}" \
 		-DFORCE_STATIC=1 -DSTATIC_LINK=ON \
-		-DBUILD_TESTING=OFF -DBUILD_CMAKE_DOCS=OFF \
+		-DBUILD_TESTING=OFF -DBUILD_CMAKE_DOCS=OFF -DCMAKE_EXE_LINKER_FLAGS="-latomic" \
 	&& ninja -C build && ninja -C build install
 
 
