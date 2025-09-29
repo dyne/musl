@@ -15,6 +15,13 @@ Download and install in one line of shell:
 curl -L dl.dyne.org/musl | sudo tar -C /opt -xJf -
 ```
 
+Or use the [dyne/musl-action](https://github.com/dyne/musl-action) in a github action:
+```yaml
+- uses: dyne/musl-action@main
+  with:
+    target_arch: 'x86_64' # or arm_64, arm_hf, riscv_64
+```
+
 The hard-coded absolute path this toolchain resides is: `/opt/dyne/gcc-musl`
 
 One should therefore include `/opt/dyne/gcc-musl/bin` in $PATH:
