@@ -10,6 +10,7 @@ ZLIB ?= zlib-ng-2.2.4
 CURL ?= curl-8.15.0
 SSH2 ?= libssh2-1.11.1
 CCACHE ?= ccache-4.11.3
+CMAKE ?= cmake-4.1.1
 
 R  := $(shell dirname $(CURDIR))
 T  := $(R)/dyne/$(ARCH)
@@ -25,7 +26,8 @@ all: \
 	$(T)/lib/libz.a    \
 	$(T)/lib/libcurl.a \
 	$(T)/lib/libssh2.a \
-	$(T)/bin/ccache
+	$(T)/bin/ccache \
+	$(T)/bin/cmake
 
 $(T)/lib/libssl.a: $(LIBSSL).orig
 	$(info Building SSL library)
@@ -81,6 +83,16 @@ $(T)/bin/ccache: $(CCACHE).orig
 		-DREDIS_STORAGE_BACKEND=OFF -DSTATIC_LINK=ON \
 	&& ninja -C build && ninja -C build install
 
+$(T)/bin/cmake: $(CMAKE).orig
+	$(info Building CMAKE)
+	mkdir -p $(CMAKE).orig/build && cd $(CMAKE).orig && \
+	cmake -G Ninja -S . -B build -DARCH=${ARCH} -DROOT="$(R)" \
+	-DCMAKE_TOOLCHAIN_FILE="${R}/settings.cmake" -DCMAKE_INSTALL_PREFIX="${R}/dyne/${ARCH}" \
+		-DFORCE_STATIC=1 -DSTATIC_LINK=ON \
+		-DBUILD_TESTING=OFF -DBUILD_CMAKE_DOCS=OFF \
+	&& ninja -C build && ninja -C build install
+
+
 # upstream: https://ftp.openbsd.org/pub/OpenBSD/LibreSSL/
 $(LIBSSL).tar.gz:
 	curl -L https://files.dyne.org/?file=musl/sources/$@ --output $@
@@ -100,6 +112,10 @@ $(SSH2).tar.xz:
 $(CCACHE).tar.xz:
 	curl -L https://files.dyne.org/?file=musl/sources/$@ --output $@
 
+# upstream: https://github.com/Kitware/CMake/releases/download/v4.1.1/cmake-4.1.1.tar.gz
+$(CMAKE).tar.gz:
+	curl -L https://files.dyne.org/?file=musl/sources/$@ --output $@
+
 clean:
 	rm -rf *.orig
 	rm -f \
@@ -108,7 +124,8 @@ clean:
 		$(T)/lib/libz.*    \
 		$(T)/lib/libcurl.* \
 		$(T)/lib/libssh2.* \
-		$(T)/bin/ccache
+		$(T)/bin/ccache \
+		$(T)/bin/cmake
 
 %.orig: %.tar.gz
 	tar zxf - < $<
