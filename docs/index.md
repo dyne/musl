@@ -12,7 +12,7 @@ hero:
   actions:
     - theme: sponsor
       text: "📥 FREE DOWNLOADS"
-      link: 'https://files.dyne.org/?dir=musl'
+      link: 'https://files.dyne.org/musl'
 
 features:
   - title: 👟 Zero dependencies

@@ -64,7 +64,7 @@ option(FORCE_STATIC "Force linker flags to build static executables (may fix or 
 
 ## Source components
 
-All sources are mirrored on [files.dyne.org](https://files.dyne.org/musl?dir=musl/sources)
+All sources are mirrored on [files.dyne.org](https://files.dyne.org/musl/sources)
 
 The latest build includes the following source components: `binutils-2.44.tar.gz`, `gcc-15.1.0.tar.xz`, `gmp-6.1.2.tar.bz2`, `linux-5.8.5.tar.xz`, `mpc-1.1.0.tar.gz`, `mpfr-4.0.2.tar.bz2`, and `musl-1.2.5.tar.gz`.
 

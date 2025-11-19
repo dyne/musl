@@ -11,6 +11,8 @@ CURL ?= curl-8.15.0
 SSH2 ?= libssh2-1.11.1
 CCACHE ?= ccache-4.11.3
 CMAKE ?= cmake-4.1.1
+# files.dyne.org URLs
+SOURCES_URL := https://files.dyne.org/musl/sources/
 
 R  := $(shell dirname $(CURDIR))
 T  := $(R)/dyne/$(ARCH)
@@ -95,26 +97,26 @@ $(T)/bin/cmake: $(CMAKE).orig
 
 # upstream: https://ftp.openbsd.org/pub/OpenBSD/LibreSSL/
 $(LIBSSL).tar.gz:
-	curl -L https://files.dyne.org/?file=musl/sources/$@ --output $@
+	curl -L ${SOURCES_URL}/$@ --output $@
 
 # upstream: https://github.com/zlib-ng/zlib-ng/releases
 $(ZLIB).tar.gz:
-	curl -L https://files.dyne.org/?file=musl/sources/$@ --output $@
+	curl -L ${SOURCES_URL}/$@ --output $@
 
 # upstream: https://curl.se/download/curl-8.15.0.tar.xz
 $(CURL).tar.xz:
-	curl -L https://files.dyne.org/?file=musl/sources/$@ --output $@
+	curl -L ${SOURCES_URL}/$@ --output $@
 
 # upstream: https://libssh2.org
 $(SSH2).tar.xz:
-	curl -L https://files.dyne.org/?file=musl/sources/$@ --output $@
+	curl -L ${SOURCES_URL}/$@ --output $@
 
 $(CCACHE).tar.xz:
-	curl -L https://files.dyne.org/?file=musl/sources/$@ --output $@
+	curl -L ${SOURCES_URL}/$@ --output $@
 
 # upstream: https://github.com/Kitware/CMake/releases/download/v4.1.1/cmake-4.1.1.tar.gz
 $(CMAKE).tar.gz:
-	curl -L https://files.dyne.org/?file=musl/sources/$@ --output $@
+	curl -L ${SOURCES_URL}/$@ --output $@
 
 clean:
 	rm -rf *.orig
