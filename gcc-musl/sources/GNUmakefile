@@ -12,16 +12,16 @@ all: config.sub \
 	musl-1.2.5.tar.gz
 
 %.sub:
-	curl -L https://files.dyne.org/?file=musl/sources/$@ --output $@
+	curl -L https://files.dyne.org/sources/$@ --output $@
 
 %.tar.gz:
-	curl -L https://files.dyne.org/?file=musl/sources/$@ --output $@
+	curl -L https://files.dyne.org/sources/$@ --output $@
 
 %.tar.xz:
-	curl -L https://files.dyne.org/?file=musl/sources/$@ --output $@
+	curl -L https://files.dyne.org/sources/$@ --output $@
 
 %.tar.bz2:
-	curl -L https://files.dyne.org/?file=musl/sources/$@ --output $@
+	curl -L https://files.dyne.org/sources/$@ --output $@
 
 clean:
 	rm -f *.sub *.tar.*
