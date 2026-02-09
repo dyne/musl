@@ -150,7 +150,7 @@ jobs:
       - name: Remove tag
         uses: dev-drprasad/delete-tag-and-release@v1.0
         with:
-          tag_name: ${{ needs.semantic-release.outputs.new_release_version }}
+          tag_name: v${{ needs.semantic-release.outputs.new_release_version }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
           delete_release: false
           repo: dyne/musl
