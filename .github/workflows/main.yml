@@ -24,9 +24,9 @@ jobs:
       new_release_version: ${{ steps.semantic-release.outputs.new_release_version }}
     if: ${{ github.ref_name == 'master' && github.event_name == 'push' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Semantic Release
-        uses: cycjimmy/semantic-release-action@v4
+        uses: cycjimmy/semantic-release-action@v6
         id: semantic-release
         with:
           extra_plugins: |
@@ -57,7 +57,7 @@ jobs:
       TARGET: ${{ matrix.target }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
       - name: prepare ccache in alpine chroot
@@ -84,7 +84,7 @@ jobs:
           echo "Compressing:  dyne-gcc-musl-${{ matrix.output }}.tar.xz"
           tar -cJf dyne-gcc-musl-${{ matrix.output }}.tar.xz dyne
       - name: Upload release artifacts dyne-gcc-musl-${{ matrix.output }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: release-${{ matrix.output }}
           path: |
@@ -96,7 +96,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: download binary artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           path: |
             dyne-gcc-musl
@@ -144,7 +144,7 @@ jobs:
     if: ${{ (failure() || cancelled()) && needs.semantic-release.outputs.new_release_published == 'True' }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
       - name: Remove tag
