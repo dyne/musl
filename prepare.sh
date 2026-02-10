@@ -15,7 +15,6 @@ find dyne/gcc-musl/bin dyne/gcc-musl/lib -type f -exec file {} + \
 | grep -E '(LSB exec|pie exec|shared obj|ar archive)' | cut -d: -f1 \
 | xargs strip -g
 
-rm -rf "dyne/${1}/share/cmake-4.1/"
 find dyne/${1} -type f -exec file {} + \
 | grep -E '(LSB exec|pie exec|shared obj|ar archive)' | cut -d: -f1 \
 | xargs dyne/gcc-musl/bin/${1}-strip -g
