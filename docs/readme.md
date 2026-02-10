@@ -108,6 +108,7 @@ The sequence of commands to build is:
 1. `sudo make chroot`
 2. `/alpine/enter-chroot make gcc`
 3. `/alpine/enter-chroot make libs`
+4. `/alpine/destroy --remove`
 
 Assuming you are building in */home/user/devel/musl* then the built toolchain will be found at the same path inside the chroot, for example in /opt/alpine*/home/user/devel/musl/dyne*.
 
