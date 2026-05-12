@@ -10,6 +10,7 @@ ZLIB ?= zlib-ng-2.2.4
 CURL ?= curl-8.15.0
 SSH2 ?= libssh2-1.11.1
 CCACHE ?= ccache-4.11.3
+NCURSES ?= ncurses-6.6
 # files.dyne.org URLs
 SOURCES_URL := https://files.dyne.org/musl/sources/
 
@@ -27,6 +28,7 @@ all: \
 	$(T)/lib/libz.a    \
 	$(T)/lib/libcurl.a \
 	$(T)/lib/libssh2.a \
+	$(T)/lib/libncursesw.a \
 	$(T)/bin/ccache
 
 $(T)/lib/libssl.a: $(LIBSSL).orig
@@ -72,6 +74,12 @@ $(T)/lib/libssh2.a: $(SSH2).orig
 # --build=x86_64-linux-musl --host=$(ARCH) \
 # && $(MAKE) -j`nproc` && $(MAKE) install
 
+$(T)/lib/libncursesw.a: $(NCURSES).orig
+	$(info Building ncurses library)
+	cd $(NCURSES).orig && \
+	./configure --enable-static --disable-dynamic \
+	&& make && make install
+
 # -DCMAKE_INSTALL_PREFIX="${PREFIX}/${ARCH}"
 $(T)/bin/ccache: $(CCACHE).orig
 	$(info Building CCACHE)
@@ -82,6 +90,7 @@ $(T)/bin/ccache: $(CCACHE).orig
 		-DHTTP_STORAGE_BACKEND=OFF -DENABLE_TESTING=OFF \
 		-DREDIS_STORAGE_BACKEND=OFF -DSTATIC_LINK=ON \
 	&& ninja -C build && ninja -C build install
+
 
 # upstream: https://ftp.openbsd.org/pub/OpenBSD/LibreSSL/
 $(LIBSSL).tar.gz:
@@ -100,6 +109,10 @@ $(SSH2).tar.xz:
 	curl -L ${SOURCES_URL}/$@ --output $@
 
 $(CCACHE).tar.xz:
+	curl -L ${SOURCES_URL}/$@ --output $@
+
+# upstream: https://invisible-island.net/archives/ncurses/
+$(NCURSES).tar.gz:
 	curl -L ${SOURCES_URL}/$@ --output $@
 
 clean:
