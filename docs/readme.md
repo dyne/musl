@@ -32,7 +32,7 @@ export PATH=/opt/dyne/gcc-musl/bin:$PATH
 Look inside the bin directory for the list of executable compiler tools and setup `CC`, `CXX`, `LD` and `AR` flags accordingly for each build system used by your projects. For example:
 ```sh
 export ARCH="x86_64-linux-musl"
-export CFLAGS="-I/opt/dyne/${ARCH}/include -Os ${CFLAGS}
+export CFLAGS="-I/opt/dyne/${ARCH}/include -Os ${CFLAGS}"
 export CXXFLAGS="${CFLAGS}"
 export LDFLAGS="-static -L/opt/dyne/${ARCH}/lib ${LDFLAGS}"
 export CC="/opt/dyne/gcc-musl/bin/${ARCH}-gcc"
