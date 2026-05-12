@@ -11,6 +11,7 @@ CURL ?= curl-8.15.0
 SSH2 ?= libssh2-1.11.1
 CCACHE ?= ccache-4.11.3
 NCURSES ?= ncurses-6.6
+KYOTOCAB ?= kyotocabinet-1.2.80
 # files.dyne.org URLs
 SOURCES_URL := https://files.dyne.org/musl/sources/
 
@@ -29,6 +30,7 @@ all: \
 	$(T)/lib/libcurl.a \
 	$(T)/lib/libssh2.a \
 	$(T)/lib/libncursesw.a \
+	$(T)/lib/libkyotocabinet.a \
 	$(T)/bin/ccache
 
 $(T)/lib/libssl.a: $(LIBSSL).orig
@@ -76,8 +78,11 @@ $(T)/lib/libssh2.a: $(SSH2).orig
 
 $(T)/lib/libncursesw.a: $(NCURSES).orig
 	$(info Building ncurses library)
-	cd $(NCURSES).orig && \
-	./configure --enable-static --disable-dynamic \
+	cd $(NCURSES).orig \
+	&& CC="$(CC)" CXX="$(CXX)" AR="$(AR)" \
+	CFLAGS="-static -g0 -Os -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow" \
+	./configure --prefix=$(T) --build=x86_64-linux-musl --host=$(ARCH) \
+	--enable-static --disable-shared --without-cxx-binding \
 	&& make && make install
 
 # -DCMAKE_INSTALL_PREFIX="${PREFIX}/${ARCH}"
@@ -91,6 +96,14 @@ $(T)/bin/ccache: $(CCACHE).orig
 		-DREDIS_STORAGE_BACKEND=OFF -DSTATIC_LINK=ON \
 	&& ninja -C build && ninja -C build install
 
+$(T)/lib/libkyotocabinet.a: $(KYOTOCAB).orig
+	$(info Building Kyoto Cabinet DBM)
+	cd $(KYOTOCAB).orig && \
+	CC="$(CC)" CXX="$(CXX)" AR="$(AR)" \
+	CFLAGS="-static -g0 -Os -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow" \
+	./configure --prefix=$(T) --build=x86_64-linux-musl --host=$(ARCH) \
+	--enable-static --disable-shared --disable-zlib \
+	&& make && make install
 
 # upstream: https://ftp.openbsd.org/pub/OpenBSD/LibreSSL/
 $(LIBSSL).tar.gz:
@@ -113,6 +126,10 @@ $(CCACHE).tar.xz:
 
 # upstream: https://invisible-island.net/archives/ncurses/
 $(NCURSES).tar.gz:
+	curl -L ${SOURCES_URL}/$@ --output $@
+
+# upstream: https://dbmx.net/kyotocabinet/pkg/
+$(KYOTOCAB).tar.gz:
 	curl -L ${SOURCES_URL}/$@ --output $@
 
 clean:
