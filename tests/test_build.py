@@ -289,7 +289,8 @@ class ToolchainState(Workspace):
 
     def test_legacy_flavor_child_receives_libc_flags_instead_of_flavor_name(self):
         fixture = self.work / "child.mk"
-        fixture.write_text('show-child:\n\t@$(MAKE) --no-print-directory -s -C gcc-musl print-config\n')
+        fixture.write_text('show-child:\n\t@$(MAKE) --no-print-directory -s -C gcc-musl '
+                           '-f Makefile -f config.static-small.mak print-config\n')
         result = self.ok(run("make", "--no-print-directory", "-f", str(ROOT / "GNUmakefile"),
                              "-f", str(fixture), "show-child", "MUSL_CONFIG=static-small"))
         line = next(line for line in result.stdout.splitlines() if line.startswith("MUSL_CONFIG="))
