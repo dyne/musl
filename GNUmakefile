@@ -5,6 +5,7 @@ BUILD_FLAVOR ?= static-small
 ifneq ($(filter static-small shared-optim,$(MUSL_CONFIG)),)
 BUILD_FLAVOR := $(MUSL_CONFIG)
 override MUSL_CONFIG :=
+MAKEOVERRIDES := $(filter-out MUSL_CONFIG=%,$(MAKEOVERRIDES))
 endif
 ALPINE_BRANCH ?= v3.24
 JOBS ?= $(shell nproc)
