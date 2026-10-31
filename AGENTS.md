@@ -150,8 +150,9 @@ Read `gcc-musl/patches/README.md` for the patch-port record, and update docs.
 There is no download_from_dyne.sh and no second explicit source manifest.
 
 Every selected input comes directly from its upstream project using exact URLs
-in `sources.urls`: official release archives for packages and GNU's repository
-at revision `3d5db9ebe860` for config.sub. The old `SOURCES_URL` source-mirror
+in `sources.urls`: official release archives for packages and GNU Gnulib's
+upstream mirror for config.sub, with unchanged GNU config revision
+`3d5db9ebe860`. The old `SOURCES_URL` source-mirror
 override has been removed and is ignored. No build input depends on Dyne's
 source cache. There is no automatic version selection or mirror fallback.
 Local verified download caches remain available for repeat and offline builds.
@@ -160,10 +161,15 @@ New downloads fail on HTTP errors and publish only after verification. Corrupt
 existing inputs fail closed; remove the identified entry before retrying.
 An external SOURCES path must already contain all inputs and is treated as
 immutable. See maintenance for digest provenance and config.sub revision keys.
-config.sub uses `git+https://REPOSITORY.git#FULL_40_HEX_COMMIT:relative/path` in
-the URL manifest. Its exact Git blob is fetched with bounded retries/timeouts
-and checked against the unchanged SHA-256. Git and timeout are needed on a fresh
-download; cgit's HTTP frontend returned intermittent 404s even at the full pin.
+config.sub uses an immutable raw repository URL in coreutils/gnulib at commit
+`52b0cbbc7bc3be8137ea0a71be48f62d68aa98ff`, path build-aux/config.sub. Its Git
+blob `8d39c4ba39fe355d2282cc414828c01b762df133` and SHA-256 exactly match the
+original GNU config pin. Savannah's cgit endpoint returned intermittent 404s;
+its Git endpoint then timed out/transferred too slowly on two master CI targets.
+Keep this routing independent of Savannah; do not use an unpinned branch URL.
+The downloader still supports `git+https://REPOSITORY.git#FULL_40_HEX_COMMIT:PATH`
+for explicitly selected Git inputs, with bounded retries, timeouts and SHA-256
+checks. Git and timeout are required when downloading such inputs.
 
 CI's compressed 2 GiB ccache snapshots are keyed by target, Alpine branch and
 build flavor, with a stable v2 prefix and no commit/PR identifier. PRs can restore

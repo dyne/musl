@@ -98,18 +98,27 @@ and reconstruct it to avoid retaining obsolete headers and libraries.
 
 `sources.urls` records one exact upstream URL per manifest key. Compiler
 and library Make rules always resolve their downloads through this manifest.
-Packages use official release archives; config.sub comes directly from
-[GNU's Git repository](https://git.savannah.gnu.org/git/config.git).
-For a single pinned file, the manifest syntax is
+Packages use official release archives; config.sub comes from
+[GNU Gnulib's upstream mirror](https://github.com/coreutils/gnulib/blob/52b0cbbc7bc3be8137ea0a71be48f62d68aa98ff/build-aux/config.sub)
+at immutable commit `52b0cbbc7bc3be8137ea0a71be48f62d68aa98ff` using its raw
+repository URL. This is the same GNU config revision `3d5db9ebe860`: both copies
+have Git blob ID `8d39c4ba39fe355d2282cc414828c01b762df133` and SHA-256
+`75d5d255a2a273b6e651f82eecfabf6cbcd8eaeae70e86b417384c8f4a58d8d3`.
+The original revision key and checksum remain unchanged. Savannah's cgit
+frontend returned intermittent 404s, and its Git endpoint subsequently exhausted
+all three fetch attempts with slow-transfer/time-limit failures on two master
+CI targets. The default build therefore does not depend on either endpoint.
+Do not replace the immutable commit with a branch such as master.
+
+For deliberately selected Git inputs, the downloader also supports
 `git+https://REPOSITORY.git#FULL_40_HEX_COMMIT:relative/path`.
 The downloader shallow-fetches that exact commit into a private temporary bare
-repository and reads the blob, avoiding the cgit HTTP frontend that intermittently
-returned 404 even with a full revision. Git and `timeout` are required for fresh
+repository and reads the blob. Git and `timeout` are required for fresh
 Git inputs. Fetches have a 120-second limit and at most three attempts; revision,
 file type and SHA-256 are checked before publishing. Temporary state is removed
 on failure. Use a full commit, not a branch/tag or abbreviated revision.
-Its bytes match the previously pinned SHA-256, so this routing change does not
-change the helper or any package version. There is no source-mirror upload
+The config.sub routing change does not change the helper or any package version.
+There is no source-mirror upload
 prerequisite, source-cache service dependency or fallback on HTTP/integrity errors.
 
 The old `SOURCES_URL` mirror override has been removed; setting it no longer
@@ -138,9 +147,10 @@ add the filename's legacy `gcc-musl/hashes/*.sha1` catalog entry and its stronge
 still identify supported archive names; SHA-256 enforces build-time integrity.
 For config.sub, the manifest key includes `CONFIG_SUB_REV` even though the cached
 filename is `config.sub`. A changed revision requires replacing the old cached
-config.sub with the verified new one. Update the full commit in the Git URL and
-the revision key/configuration together; hash the exact blob bytes, not an
-archive of the repository.
+config.sub with the verified new one. Update the full repository commit in the
+URL and the original GNU config revision key/configuration together; hash the
+exact blob bytes, not an archive of the repository. When using Gnulib's copy,
+record its commit separately and verify that its blob matches GNU config.
 
 For libraries, update the version/archive variables in `libs/GNUmakefile`,
 `sources.urls` and the SHA-256 manifest. Use the upstream release archive URL;
