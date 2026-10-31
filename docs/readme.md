@@ -58,7 +58,7 @@ set(CMAKE_CXX_FLAGS "-static --static -g0 -Os -fstack-protector-all -D_FORTIFY_S
 set(CMAKE_C_FLAGS "-static --static -g0 -Os -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow" CACHE STRING "C Compilation flags, default set for small and secure binaries")
 set(ROOT "/opt" CACHE STRING "Base root prefix for installation (often referred as PREFIX or DESTDIR)")
 option(CCACHE "Use ccache to speed up compilation" 1)
-option(FOR_MUSL_DYNE "Install target will copy everything inside /opt/musl-dyne" 0)
+option(FOR_MUSL_DYNE "Install into /opt/dyne/<target tuple>" 0)
 option(FORCE_STATIC "Force linker flags to build static executables (may fix or break some cases)" 0)
 ```
 
@@ -68,7 +68,11 @@ All sources are mirrored on [files.dyne.org](https://files.dyne.org/musl/sources
 
 The latest build includes the following source components: `binutils-2.44.tar.gz`, `gcc-15.1.0.tar.xz`, `gmp-6.1.2.tar.bz2`, `linux-5.8.5.tar.xz`, `mpc-1.1.0.tar.gz`, `mpfr-4.0.2.tar.bz2`, and `musl-1.2.5.tar.gz`.
 
-Additional base libraries and utilities provided are `libressl-4.1.0`, `zlib-ng-2.2.4`, `curl-8.15.0`, `libssh2-1.11.1`, and `ccache-4.11.3`.
+Additional base libraries and utilities provided are `libressl-4.1.0`, `zlib-ng-2.2.4`, `curl-8.15.0`, `libssh2-1.11.1`, `ccache-4.11.3`, `ncurses-6.6` (wide-character static library), and `kyotocabinet-1.2.80`.
+
+Downloads, including cached archives, are checked against the pinned
+`sources.sha256` manifest. See [maintenance](maintenance.md) for package updates,
+build validation, and release recovery.
 
 Build flags used: `--disable-nls --disable-libmudflap --disable-libsanitizer --disable-lto`. Features enabled: decimal-float, fixed-point, quadmath, as well libitm to satisfy advanced C++ requirements. Debugging functions are omitted.
 
@@ -104,13 +108,30 @@ musl-cross-make's patch set provides:
 
 In order to build a static toolchain, we use Alpine in a chroot with bind-mount of current dir and therefore require super-user privileges.
 
-The sequence of commands to build is:
-1. `sudo make chroot`
-2. `/alpine/enter-chroot make gcc`
-3. `/alpine/enter-chroot make libs`
-4. `/alpine/destroy --remove`
+From the repository directory:
 
-Assuming you are building in */home/user/devel/musl* then the built toolchain will be found at the same path inside the chroot, for example in /opt/alpine*/home/user/devel/musl/dyne*.
+```sh
+export ARCH=x86_64-linux-musl  # or another target tuple listed above
+sudo make chroot
+/alpine/enter-chroot make prepare
+/alpine/enter-chroot make smoke
+/alpine/destroy --remove
+```
+
+`make prepare` builds the compiler and all libraries in dependency order before
+stripping and packaging preparation. Outputs are visible on the host in
+`./dyne/` through the bind mount. `make gcc` and `make libs` remain available for
+individual stages; `make libs` first ensures the compiler is current. The build
+uses the Alpine `v3.24` branch and the `static-small` configuration by default.
+Select a different compiler configuration with `BUILD_FLAVOR=shared-optim`.
+The Alpine branch is pinned, but package revisions within that branch can change.
+
+Library work directories are separate for each target under `build/libs/`.
+Changes to flags, recipes, versions, or the compiler invalidate library state
+and replace that target's staged library prefix. Use dedicated installation
+directories when overriding `PREFIX`. `make clean` removes staged outputs and
+build state, keeping verified download caches. ncurses terminfo data is supplied
+by the runtime system, not bundled in these library packages.
 
 ## License
 
@@ -137,9 +158,17 @@ conditions.
 
 When updating to make a new release:
 
-1. Check upstream updates https://github.com/richfelker/musl-cross-make and rebase if necessary
-2. Update components in config.mak (defaults are in Makefile)
-3. Run make to download sources/ from mirrors
-4. Upload sources to files.dyne.org in musl/sources
-5. Update `sources/download_from_dyne.sh` script
-6. Prefix commit with semantic versioning (`fix:` or `feat:`)
+1. Review upstream [musl-cross-make](https://github.com/richfelker/musl-cross-make)
+   changes and port relevant build and version-specific patch updates.
+2. Update compiler versions in `gcc-musl/Makefile` and both Dyne configurations,
+   or library versions in `libs/GNUmakefile`. Add the required source hash entries
+   and independently verified SHA-256 values to `sources.sha256`.
+3. Mirror the exact verified source archives on `files.dyne.org/musl/sources/`.
+4. Run `make test` and clean builds/smoke checks for all four targets; update docs.
+5. Use a conventional commit (`fix:`, `feat:`, or a documented breaking change).
+   CI validates every target on pull requests and master pushes. On a releasing
+   master push, semantic-release creates `vX.Y.Z` only after validation succeeds.
+
+Failed publication preserves its tag and any draft assets. The
+[maintenance guide](maintenance.md) explains how to retry the exact validated
+commit without deleting tags or creating a new version.

@@ -10,8 +10,9 @@ COMMON_CONFIG += CFLAGS="-g0 -O3 -march=native"
 COMMON_CONFIG += CXXFLAGS="-g0 -O3 -march=native"
 # -march=x86-64-v2 -march=haswell
 COMMON_CONFIG += LDFLAGS="-s"
-COMMON_CONFIG += CC="ccache gcc"
-COMMON_CONFIG += CXX="ccache g++"
+CCACHE_LAUNCHER ?= $(shell command -v ccache 2>/dev/null)
+COMMON_CONFIG += CC="$(CCACHE_LAUNCHER) gcc"
+COMMON_CONFIG += CXX="$(CCACHE_LAUNCHER) g++"
 COMMON_CONFIG += --disable-nls --disable-libmudflap --disable-libsanitizer
 # --disable-libquadmath --disable-decimal-float --disable-libitm --disable-lto
 # --disable-fixed-point --disable-lto

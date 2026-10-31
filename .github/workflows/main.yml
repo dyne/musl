@@ -1,45 +1,46 @@
 name: musl-dyne
 on:
   push:
-    paths-ignore:
-      - '*.md'
-    branches:
-      - master
+    branches: [master]
+    paths-ignore: ['**.md']
   pull_request:
-    paths-ignore:
-      - '*.md'
-    branches:
-      - master
+    branches: [master]
+    paths-ignore: ['**.md']
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Optional existing vX.Y.Z tag at this commit to retry publication'
+        required: false
+        type: string
 
+permissions:
+  contents: read
+
+# Never cancel an in-progress publication when master advances.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref_name }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  semantic-release:
-    name: 🤖 Semantic release
-    runs-on: ubuntu-latest
-    outputs:
-      new_release_published: ${{ steps.semantic-release.outputs.new_release_published }}
-      new_release_version: ${{ steps.semantic-release.outputs.new_release_version }}
-    if: ${{ github.ref_name == 'master' && github.event_name == 'push' }}
+  checks:
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
-      - name: Semantic Release
-        uses: cycjimmy/semantic-release-action@v6
-        id: semantic-release
-        with:
-          extra_plugins: |
-            @semantic-release/changelog
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install validation tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck python3-yaml
+      - name: Regression checks
+        run: |
+          make test
+          shellcheck prepare.sh scripts/*.sh
 
   gcc-musl-build:
-    name: 🐧 Build release
-    runs-on: ubuntu-latest
-    needs: [semantic-release]
-    if: ${{ needs.semantic-release.outputs.new_release_published == 'true' }}
+    name: Build and validate ${{ matrix.target }}
+    needs: checks
+    runs-on: ubuntu-24.04
     strategy:
+      fail-fast: false
       matrix:
         include:
           - target: x86_64-linux-musl
@@ -50,107 +51,132 @@ jobs:
             output: riscv_64
           - target: aarch64-linux-musl
             output: arm_64
-      fail-fast: true
     env:
+      ARCH: ${{ matrix.target }}
       CCACHE_DIR: /alpine/root/.cache/ccache
       XZ_OPT: -9e -T0
-      TARGET: ${{ matrix.target }}
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-      - name: prepare ccache in alpine chroot
+      - uses: actions/checkout@v6
+      - name: Prepare host ccache directory
         run: |
           sudo mkdir -p /alpine/root/.cache/ccache
           sudo chmod -R a+rw /alpine/root/.cache
-      - name: ccache
-        uses: hendrikmuhs/ccache-action@v1.2
-      - name: Build chroot ${{ matrix.target }}
+      - uses: hendrikmuhs/ccache-action@v1.2
+      - name: Build pinned Alpine chroot
+        run: sudo make chroot
+      - name: Build compiler and libraries, prepare package
+        shell: bash
         run: |
-          sudo make chroot
-          echo "export ARCH=\"${{ matrix.target }}\"" | sudo tee /alpine/etc/profile
-      - name: Build gcc-musl ${{ matrix.target }}
+          set -o pipefail
+          mkdir -p test-results
+          /alpine/enter-chroot make prepare 2>&1 | tee test-results/build.log
+      - name: Compile and inspect packaged C/C++ applications
+        shell: bash
         run: |
-          /alpine/enter-chroot make gcc
-      - name: Build libs ${{ matrix.target }}
+          set -o pipefail
+          /alpine/enter-chroot make smoke 2>&1 | tee test-results/smoke.log
+      - name: Compress validated package
+        env:
+          OUTPUT_SUFFIX: ${{ matrix.output }}
         run: |
-          /alpine/enter-chroot make libs
-      - name: Prepare ${{ matrix.target }}
-        run: |
-          /alpine/enter-chroot make prepare
-      - name: Compress the package
-        run: |
-          echo "Compressing:  dyne-gcc-musl-${{ matrix.output }}.tar.xz"
-          tar -cJf dyne-gcc-musl-${{ matrix.output }}.tar.xz dyne
-      - name: Upload release artifacts dyne-gcc-musl-${{ matrix.output }}
-        uses: actions/upload-artifact@v6
+          tar -cJf "dyne-gcc-musl-${OUTPUT_SUFFIX}.tar.xz" dyne
+          python3 scripts/check-archive.py "$ARCH" "dyne-gcc-musl-${OUTPUT_SUFFIX}.tar.xz"
+      - uses: actions/upload-artifact@v6
         with:
           name: release-${{ matrix.output }}
-          path: |
-            dyne-gcc-musl-${{ matrix.output }}.tar.xz
-
-  draft-binary-release:
-    name: 📦 Upload release
-    needs: [semantic-release, gcc-musl-build]
-    runs-on: ubuntu-latest
-    steps:
-      - name: download binary artifacts
-        uses: actions/download-artifact@v7
+          path: dyne-gcc-musl-${{ matrix.output }}.tar.xz
+          if-no-files-found: error
+      - name: Retain diagnostic evidence on success and failure
+        if: always()
+        uses: actions/upload-artifact@v6
         with:
+          name: logs-${{ matrix.output }}
           path: |
-            dyne-gcc-musl
-      - name: show directory structure
-        run: tree -dL 3 dyne-gcc-musl
-      - name: compute sha256 hash checksums
+            test-results/
+            build/libs/**/config.log
+            build/libs/**/CMakeConfigureLog.yaml
+            gcc-musl/build/**/config.log
+          if-no-files-found: warn
+          retention-days: 90
+
+  release:
+    name: Publish validated artifacts
+    needs: [checks, gcc-musl-build]
+    if: >-
+      (github.event_name == 'push' && github.ref == 'refs/heads/master') ||
+      (github.event_name == 'workflow_dispatch' && inputs.release_tag != '')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: release-*
+          merge-multiple: true
+          path: release
+      - name: Verify complete artifact set and create checksums before tagging
+        run: bash scripts/release-checksums.sh release
+      - name: Validate explicitly requested retry
+        if: github.event_name == 'workflow_dispatch'
+        id: retry
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
-          mkdir -p dyne-gcc-musl/checksums
-          find dyne-gcc-musl -type f -exec sha256sum {} \; | awk '{ split($2, a, "/"); print $1, a[length(a)] }' | tee dyne-gcc-musl/checksums/SHA256SUMS.txt
-      - name: upload releases to files.dyne.org
+          bash scripts/assert-release-tag.sh "$RELEASE_TAG" "$GITHUB_SHA"
+          printf 'tag=%s\npublished=true\n' "$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+      - name: Select version after all builds pass
+        if: github.event_name == 'push'
+        id: semantic-release
+        uses: cycjimmy/semantic-release-action@v6
+        with:
+          semantic_version: 24.2.7
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Validate selected tag and retain release notes
+        if: steps.semantic-release.outputs.new_release_published == 'true' || steps.retry.outputs.published == 'true'
+        env:
+          RELEASE_TAG: ${{ steps.retry.outputs.tag || steps.semantic-release.outputs.new_release_git_tag }}
+          RELEASE_NOTES: ${{ steps.semantic-release.outputs.new_release_notes }}
+        run: |
+          bash scripts/assert-release-tag.sh "$RELEASE_TAG" "$GITHUB_SHA"
+          printf '%s\n' "$RELEASE_NOTES" > release-notes.txt
+      - name: Stage GitHub release assets for recoverable publication
+        if: steps.semantic-release.outputs.new_release_published == 'true' || steps.retry.outputs.published == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.retry.outputs.tag || steps.semantic-release.outputs.new_release_git_tag }}
+        run: |
+          if is_draft=$(gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft 2>/dev/null); then
+            if [[ $is_draft != true ]]; then
+              echo 'Release is already public; refusing to replace published assets' >&2
+              exit 1
+            fi
+          else
+            notes=(--generate-notes)
+            if grep -q '[^[:space:]]' release-notes.txt; then
+              notes=(--notes-file release-notes.txt)
+            fi
+            gh release create "$RELEASE_TAG" --verify-tag --draft --title "$RELEASE_TAG" "${notes[@]}"
+          fi
+          gh release upload "$RELEASE_TAG" release/*.tar.xz release/SHA256SUMS.txt --clobber
+      - name: Upload archives and checksums to file mirror
+        if: steps.semantic-release.outputs.new_release_published == 'true' || steps.retry.outputs.published == 'true'
         uses: appleboy/scp-action@v1
         with:
           host: ${{ secrets.FILES_SSH_HOST }}
           username: ${{ secrets.FILES_SSH_USER }}
           key: ${{ secrets.FILES_SSH_KEY }}
           port: ${{ secrets.FILES_SSH_PORT }}
-          # scp-drone uploads dirs if wildcards are in them, so here
-          # we need to list uploaded files one by one.
-          source: |
-            dyne-gcc-musl/release-x86_64/dyne-gcc-musl-x86_64.tar.xz,
-            dyne-gcc-musl/release-arm_hf/dyne-gcc-musl-arm_hf.tar.xz,
-            dyne-gcc-musl/release-arm_64/dyne-gcc-musl-arm_64.tar.xz,
-            dyne-gcc-musl/release-riscv_64/dyne-gcc-musl-riscv_64.tar.xz,
-            dyne-gcc-musl/checksums/SHA256SUMS.txt
-          target: |
-            /srv/ftp/musl
-          strip_components: 2
+          source: release/dyne-gcc-musl-x86_64.tar.xz,release/dyne-gcc-musl-arm_hf.tar.xz,release/dyne-gcc-musl-arm_64.tar.xz,release/dyne-gcc-musl-riscv_64.tar.xz,release/SHA256SUMS.txt
+          target: /srv/ftp/musl
+          strip_components: 1
           overwrite: true
-      - name: relase all binary artifacts
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            dyne-gcc-musl/release-*/*
-            dyne-gcc-musl/checksums/SHA256SUMS.txt
-          tag_name: ${{ needs.semantic-release.outputs.new_release_version }}
-          draft: false
-          prerelease: false
-          fail_on_unmatched_files: true
-          generate_release_notes: true
-
-  remove-tag-on-fail:
-    name: 🧻 Remove tag on fail
-    needs: [semantic-release, gcc-musl-build]
-    runs-on: ubuntu-latest
-    if: ${{ (failure() || cancelled()) && needs.semantic-release.outputs.new_release_published == 'true' }}
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-      - name: Remove tag
-        uses: dev-drprasad/delete-tag-and-release@v1.0
-        with:
-          tag_name: v${{ needs.semantic-release.outputs.new_release_version }}
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          delete_release: false
-          repo: dyne/musl
+      - name: Publish GitHub release after mirror upload
+        if: steps.semantic-release.outputs.new_release_published == 'true' || steps.retry.outputs.published == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.retry.outputs.tag || steps.semantic-release.outputs.new_release_git_tag }}
+        run: gh release edit "$RELEASE_TAG" --draft=false

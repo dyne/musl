@@ -10,8 +10,19 @@
 /linux-*/
 /isl-*/
 /build/
+!/gcc-musl/
 
 # website in docs/
 .vitepress/dist
 .vitepress/cache
+/docs/.vitepress/dist/
+/docs/.vitepress/cache/
 node_modules
+
+# Local inputs, staged toolchains, target build state and test evidence.
+/.cache/
+/dyne/
+/test-results/
+/libs/*.orig/
+/libs/*.tar.*
+__pycache__/
