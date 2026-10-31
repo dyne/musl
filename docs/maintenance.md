@@ -50,7 +50,9 @@ and reconstruct it to avoid retaining obsolete headers and libraries.
 `sources.urls` records one exact upstream HTTPS URL per manifest key. Compiler
 and library Make rules always resolve their downloads through this manifest.
 Packages use official release archives; config.sub comes directly from
-[GNU's repository at the pinned revision](https://git.savannah.gnu.org/cgit/config.git/plain/config.sub?id=3d5db9ebe860).
+[GNU's repository at the pinned revision](https://cgit.git.savannah.gnu.org/cgit/config.git/plain/config.sub?id=3d5db9ebe8607382d17d60faf8853c944fc5f353).
+Use the canonical cgit host and full commit ID; the older redirecting host
+returned HTTP 404 on some CI runners.
 Its bytes match the previously pinned SHA-256, so this routing change does not
 change the helper or any package version. There is no source-mirror upload
 prerequisite, source-cache service dependency or fallback on HTTP/integrity errors.
