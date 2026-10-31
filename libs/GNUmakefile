@@ -7,7 +7,9 @@ T := $(abspath $(PREFIX))
 BUILD_ROOT ?= $(R)/build/libs
 B := $(BUILD_ROOT)/$(ARCH)
 SOURCE_CACHE ?= $(R)/.cache/sources
-SOURCES_URL ?= https://files.dyne.org/musl/sources
+SOURCES_URL ?=
+SOURCE_URLS ?= $(R)/sources.urls
+source_url = $(if $(SOURCES_URL),$(SOURCES_URL)/$(1))
 CHECKSUMS ?= $(R)/sources.sha256
 TOOLCHAIN ?= $(R)/dyne/gcc-musl
 ifneq ($(filter / $(R) $(R)/dyne $(abspath $(TOOLCHAIN)),$(T)),)
@@ -26,11 +28,11 @@ export PKG_CONFIG_LIBDIR := $(T)/lib/pkgconfig
 export PKG_CONFIG_PATH :=
 export PKG_CONFIG_SYSROOT_DIR :=
 
-LIBSSL ?= libressl-4.1.0
-ZLIB ?= zlib-ng-2.2.4
-CURL ?= curl-8.15.0
+LIBSSL ?= libressl-4.4.0
+ZLIB ?= zlib-ng-2.3.3
+CURL ?= curl-8.23.0
 SSH2 ?= libssh2-1.11.1
-CCACHE ?= ccache-4.11.3
+CCACHE ?= ccache-4.14.2
 NCURSES ?= ncurses-6.6
 KYOTOCAB ?= kyotocabinet-1.2.80
 
@@ -52,7 +54,7 @@ CMAKE_FLAGS = -G Ninja -DARCH=$(ARCH) -DROOT="$(R)" -DTARGET_PREFIX="$(T)" \
 all: build
 fetch: $(addprefix $(SOURCE_CACHE)/,$(ARCHIVES))
 	@set -e; for archive in $(ARCHIVES); do \
-		sh "$(R)/scripts/download.sh" "$(SOURCES_URL)/$$archive" "$(SOURCE_CACHE)/$$archive" "$(CHECKSUMS)"; \
+		sh "$(R)/scripts/download.sh" "$(if $(SOURCES_URL),$(SOURCES_URL)/$$archive)" "$(SOURCE_CACHE)/$$archive" "$(CHECKSUMS)" "$$archive" "$(SOURCE_URLS)"; \
 	done
 build: $(OUTPUTS)
 
@@ -80,7 +82,7 @@ $(foreach archive,$(ARCHIVES),$(eval $(call extract,$(firstword $(subst .tar., ,
 
 # These explicit file targets allow direct builds after fetching sources.
 $(addprefix $(SOURCE_CACHE)/,$(ARCHIVES)):
-	sh "$(R)/scripts/download.sh" "$(SOURCES_URL)/$(notdir $@)" "$@" "$(CHECKSUMS)"
+	sh "$(R)/scripts/download.sh" "$(call source_url,$(notdir $@))" "$@" "$(CHECKSUMS)" "$(notdir $@)" "$(SOURCE_URLS)"
 
 # GNU make grouped targets rebuild LibreSSL when either archive is missing.
 $(T)/lib/libssl.a $(T)/lib/libcrypto.a &: $(B)/$(LIBSSL)/.extracted

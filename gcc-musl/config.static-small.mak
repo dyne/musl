@@ -3,9 +3,9 @@ PREFIX ?= $(shell dirname $(CURDIR))/dyne/gcc-musl
 
 TARGET = $(ARCH)
 OUTPUT = $(PREFIX)
-GCC_VER = 15.1.0
-BINUTILS_VER = 2.44
-LINUX_VER = 5.8.5
+GCC_VER = 16.2.0
+BINUTILS_VER = 2.47
+LINUX_VER = 7.3.1
 COMMON_CONFIG += CFLAGS="-g0 -Os -march=x86-64-v2"
 COMMON_CONFIG += CXXFLAGS="-g0 -Os -march=x86-64-v2"
 # -march=x86-64-v2 -march=haswell

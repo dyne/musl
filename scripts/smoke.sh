@@ -17,11 +17,15 @@ for library in ssl crypto z curl ssh2 ncursesw kyotocabinet; do
     test -s "$target/lib/lib$library.a"
 done
 test -x "$target/bin/ccache"
+"$compiler/bin/$arch-gcc" -static -Os tests/toolchain.c -o "$build/toolchain"
+"$compiler/bin/$arch-gcc" -static-pie -Os tests/toolchain.c -o "$build/static-pie"
+"$compiler/bin/$arch-gcc" -static -pie -Os tests/toolchain.c -o "$build/static-and-pie"
 "$compiler/bin/$arch-gcc" -static -Os -I"$target/include" tests/smoke.c \
     -L"$target/lib" -lcurl -lssh2 -lssl -lcrypto -lz -lncursesw -lpthread -o "$build/c"
 "$compiler/bin/$arch-g++" -static -Os -std=c++20 -I"$target/include" tests/smoke.cpp \
     -L"$target/lib" -lkyotocabinet -latomic -lpthread -o "$build/cpp"
-for binary in "$build/c" "$build/cpp" "$target/bin/ccache"; do
+for binary in "$build/toolchain" "$build/static-pie" "$build/static-and-pie" \
+    "$build/c" "$build/cpp" "$target/bin/ccache"; do
     headers=$("$readelf" -h -l -d "$binary")
     grep -q "$machine" <<< "$headers"
     if grep -Eq 'INTERP|NEEDED' <<< "$headers"; then
@@ -29,11 +33,17 @@ for binary in "$build/c" "$build/cpp" "$target/bin/ccache"; do
         exit 1
     fi
 done
+for binary in "$build/static-pie" "$build/static-and-pie"; do
+    "$readelf" -h "$binary" | grep -Eq 'Type:[[:space:]]+DYN'
+done
 if [[ $arch == x86_64-linux-musl && $(uname -m) == x86_64 ]]; then
+    "$build/toolchain"
+    "$build/static-pie"
+    "$build/static-and-pie"
     "$build/c"
     "$build/cpp"
     "$target/bin/ccache" --version
-    echo "Native C, C++20/thread/database and ccache smoke tests passed"
+    echo "Native libc/static-PIE, C, C++20/thread/database and ccache smoke tests passed"
 else
     echo "Cross-target link/ELF checks passed for $arch; execution requires a target runner"
 fi

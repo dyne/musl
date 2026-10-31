@@ -4,6 +4,7 @@ import http.server
 import io
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -95,6 +96,29 @@ class Downloads(Workspace):
         self.assertNotEqual(self.download().returncode, 0)
         self.assertFalse(self.dest.exists())
 
+    def test_url_manifest_download_and_explicit_mirror_override(self):
+        urls = self.work / "sources.urls"
+        base = f"http://127.0.0.1:{self.server.server_port}"
+        urls.write_text(f"source.tar.gz {base}/source\n")
+        self.ok(run("sh", str(ROOT / "scripts/download.sh"), "", str(self.dest),
+                    str(self.manifest), "source.tar.gz", str(urls)))
+        self.assertEqual(self.dest.read_bytes(), self.payload)
+        self.dest.unlink()
+        # An explicit URL takes precedence, including when the manifest is absent.
+        self.ok(run("sh", str(ROOT / "scripts/download.sh"), base + "/source",
+                    str(self.dest), str(self.manifest), "source.tar.gz", str(self.work / "absent")))
+
+    def test_missing_duplicate_or_invalid_url_fails_closed(self):
+        urls = self.work / "sources.urls"
+        for entries in ["", "source.tar.gz file:///etc/passwd\n",
+                        "source.tar.gz https://example.org/a\n" * 2]:
+            urls.write_text(entries)
+            result = run("sh", str(ROOT / "scripts/download.sh"), "", str(self.dest),
+                         str(self.manifest), "source.tar.gz", str(urls))
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Missing or invalid source URL entry", result.stdout)
+            self.assertFalse(self.dest.exists())
+
 
 class LibraryBuilds(Workspace):
     """Use real Make dependencies/extraction with lightweight install fixtures."""
@@ -106,9 +130,15 @@ class LibraryBuilds(Workspace):
         shutil.copy(ROOT / "settings.cmake", self.work / "settings.cmake")
         cache = self.work / ".cache/sources"
         cache.mkdir(parents=True)
-        archives = ["libressl-4.1.0.tar.gz", "zlib-ng-2.2.4.tar.gz", "curl-8.15.0.tar.xz",
-                    "libssh2-1.11.1.tar.xz", "ccache-4.11.3.tar.xz", "ncurses-6.6.tar.gz",
-                    "kyotocabinet-1.2.80.tar.gz"]
+        recipe = (ROOT / "libs/GNUmakefile").read_text()
+        packages = dict(re.findall(r"^(LIBSSL|ZLIB|CURL|SSH2|CCACHE|NCURSES|KYOTOCAB) \?= (\S+)$",
+                                   recipe, re.MULTILINE))
+        archives = [packages[key] + suffix for key, suffix in
+                    [("LIBSSL", ".tar.gz"), ("ZLIB", ".tar.gz"), ("CURL", ".tar.xz"),
+                     ("SSH2", ".tar.xz"), ("CCACHE", ".tar.xz"), ("NCURSES", ".tar.gz"),
+                     ("KYOTOCAB", ".tar.gz")]]
+        self.ssl_package = packages["LIBSSL"]
+        self.curl_archive = packages["CURL"] + ".tar.xz"
         manifest = []
         for name in archives:
             with tarfile.open(cache / name, "w:gz" if name.endswith(".gz") else "w:xz") as archive:
@@ -122,7 +152,6 @@ class LibraryBuilds(Workspace):
         compiler.mkdir(parents=True)
         for arch in ["x86_64-linux-musl", "arm-linux-musleabihf"]:
             (compiler / (arch + "-gcc")).write_text("compiler fixture")
-        recipe = (ROOT / "libs/GNUmakefile").read_text()
         recipe += '\n$(T)/lib/libssl.a $(T)/lib/libcrypto.a &:\n'
         recipe += '\t@mkdir -p "$(T)/lib"\n\t@touch "$(T)/lib/libssl.a" "$(T)/lib/libcrypto.a"\n'
         recipe += '\t@echo ssl >> "$(T)/order"\n'
@@ -182,7 +211,7 @@ class LibraryBuilds(Workspace):
         self.assertFalse((self.target / "obsolete-header.h").exists())
         self.make("libs", "ARCH=arm-linux-musleabihf")
         for arch in ["x86_64-linux-musl", "arm-linux-musleabihf"]:
-            self.assertTrue((self.work / "build/libs" / arch / "libressl-4.1.0/input").is_file())
+            self.assertTrue((self.work / "build/libs" / arch / self.ssl_package / "input").is_file())
 
     def test_clean_removes_headers_metadata_ncurses_and_kyoto(self):
         self.make("libs")
@@ -194,7 +223,7 @@ class LibraryBuilds(Workspace):
 
     def test_cached_corruption_rejected_even_for_direct_installed_target(self):
         self.make("libs")
-        (self.work / ".cache/sources/curl-8.15.0.tar.xz").write_bytes(b"bad cache")
+        (self.work / ".cache/sources" / self.curl_archive).write_bytes(b"bad cache")
         result = run("make", "-C", "libs", str(self.target / "lib/libcurl.a"), cwd=self.work)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("failed SHA-256 verification", result.stdout)
@@ -210,6 +239,27 @@ class LibraryBuilds(Workspace):
 
 
 class ToolchainState(Workspace):
+    def test_selected_sources_have_unique_urls_digests_and_compiler_catalog_entries(self):
+        digests = {name: digest for digest, name in
+                   (line.split() for line in (ROOT / "sources.sha256").read_text().splitlines())}
+        urls = dict(line.split() for line in (ROOT / "sources.urls").read_text().splitlines())
+        self.assertEqual(len(digests), len((ROOT / "sources.sha256").read_text().splitlines()))
+        self.assertEqual(len(urls), len((ROOT / "sources.urls").read_text().splitlines()))
+        self.assertEqual(set(urls), set(digests))
+        self.assertTrue(all(re.fullmatch(r"[0-9a-f]{64}", digest) for digest in digests.values()))
+        self.assertTrue(all(url.startswith("https://") for url in urls.values()))
+        probe = self.work / "sources.mk"
+        probe.write_text('show-sources:\n\t@printf "%s\\n" $(ARCHIVES) config.sub.$(CONFIG_SUB_REV)\n')
+        for flavor in ["static-small", "shared-optim"]:
+            config = ROOT / "gcc-musl" / ("config." + flavor + ".mak")
+            result = self.ok(run("make", "--no-print-directory", "-s", "-C", str(ROOT / "gcc-musl"),
+                                 "-f", "Makefile", "-f", str(config), "-f", str(probe), "show-sources"))
+            names = result.stdout.splitlines()
+            self.assertEqual(len(names), 8)
+            for name in names:
+                self.assertIn(name, urls)
+                self.assertTrue((ROOT / "gcc-musl/hashes" / (name + ".sha1")).is_file())
+
     def test_new_hashes_and_patches_are_visible_while_generated_sources_are_ignored(self):
         self.ok(run("git", "init", "-q", cwd=self.work))
         shutil.copy(ROOT / ".gitignore", self.work / ".gitignore")

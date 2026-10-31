@@ -64,11 +64,16 @@ option(FORCE_STATIC "Force linker flags to build static executables (may fix or 
 
 ## Source components
 
-All sources are mirrored on [files.dyne.org](https://files.dyne.org/musl/sources)
+Exact release URLs are recorded in [sources.urls](https://github.com/dyne/musl/blob/master/sources.urls).
+Builds download from upstream by default; a populated [Dyne source mirror](https://files.dyne.org/musl/sources)
+can be selected with `SOURCES_URL=https://files.dyne.org/musl/sources`.
 
-The latest build includes the following source components: `binutils-2.44.tar.gz`, `gcc-15.1.0.tar.xz`, `gmp-6.1.2.tar.bz2`, `linux-5.8.5.tar.xz`, `mpc-1.1.0.tar.gz`, `mpfr-4.0.2.tar.bz2`, and `musl-1.2.5.tar.gz`.
+The source configuration includes `binutils-2.47.tar.xz`, `gcc-16.2.0.tar.xz`, `gmp-6.3.0.tar.xz`, `linux-7.3.1.tar.xz` (userspace headers), `mpc-1.4.1.tar.xz`, `mpfr-4.2.2.tar.xz`, and `musl-1.2.6.tar.gz`.
 
-Additional base libraries and utilities provided are `libressl-4.1.0`, `zlib-ng-2.2.4`, `curl-8.15.0`, `libssh2-1.11.1`, `ccache-4.11.3`, `ncurses-6.6` (wide-character static library), and `kyotocabinet-1.2.80`.
+Additional base libraries and utilities are `libressl-4.4.0`, `zlib-ng-2.3.3`, `curl-8.23.0`, `libssh2-1.11.1`, `ccache-4.14.2`, `ncurses-6.6` (wide-character static library), and `kyotocabinet-1.2.80`.
+
+Versions were checked against upstream stable releases on 2026-10-31. Published
+archives may lag the source configuration until release validation completes.
 
 Downloads, including cached archives, are checked against the pinned
 `sources.sha256` manifest. See [maintenance](maintenance.md) for package updates,
@@ -162,8 +167,9 @@ When updating to make a new release:
    changes and port relevant build and version-specific patch updates.
 2. Update compiler versions in `gcc-musl/Makefile` and both Dyne configurations,
    or library versions in `libs/GNUmakefile`. Add the required source hash entries
-   and independently verified SHA-256 values to `sources.sha256`.
-3. Mirror the exact verified source archives on `files.dyne.org/musl/sources/`.
+   and verified URL/SHA-256 entries to `sources.urls` and `sources.sha256`.
+3. Check version-specific patches for upstream integration and refresh remaining
+   hunks. Mirror the exact verified archives when maintaining the source mirror.
 4. Run `make test` and clean builds/smoke checks for all four targets; update docs.
 5. Use a conventional commit (`fix:`, `feat:`, or a documented breaking change).
    CI validates every target on pull requests and master pushes. On a releasing
