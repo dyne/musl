@@ -287,6 +287,15 @@ class ToolchainState(Workspace):
                              "-f", str(fixture), "show-options", "MUSL_CONFIG=shared-optim"))
         self.assertEqual(result.stdout, "shared-optim\n\n")
 
+    def test_legacy_flavor_child_receives_libc_flags_instead_of_flavor_name(self):
+        fixture = self.work / "child.mk"
+        fixture.write_text('show-child:\n\t@$(MAKE) --no-print-directory -s -C gcc-musl print-config\n')
+        result = self.ok(run("make", "--no-print-directory", "-f", str(ROOT / "GNUmakefile"),
+                             "-f", str(fixture), "show-child", "MUSL_CONFIG=static-small"))
+        line = next(line for line in result.stdout.splitlines() if line.startswith("MUSL_CONFIG="))
+        self.assertIn('-fPIC', line)
+        self.assertNotIn('static-small', line)
+
     def test_external_sources_are_not_populated_or_modified(self):
         external = self.work / "immutable-sources"
         result = run("make", "-C", str(ROOT / "gcc-musl"), "fetch-sources", "SOURCES=" + str(external))
