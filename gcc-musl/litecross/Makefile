@@ -10,8 +10,11 @@ COMMON_CONFIG =
 GCC_CONFIG = 
 TOOLCHAIN_CONFIG = 
 
+LITECROSS_MAKEFILE := $(realpath $(lastword $(MAKEFILE_LIST)))
 XGCC_DIR = ../obj_gcc/gcc
-XGCC = $(XGCC_DIR)/xgcc -B $(XGCC_DIR)
+XGCC = $(CCACHE_LAUNCHER) $(XGCC_DIR)/xgcc -B $(XGCC_DIR)
+CACHE_ENV = sh "$(abspath $(dir $(LITECROSS_MAKEFILE))/../../scripts/compiler-cache.sh)" \
+	"$(CCACHE_LAUNCHER)" "$(CURDIR)/obj_gcc/gcc/xgcc"
 
 -include config.mak
 
@@ -224,36 +227,38 @@ obj_gcc/gcc/.lc_built: | obj_gcc/.lc_configured
 	touch $@
 
 obj_musl/.lc_configured: | obj_musl src_musl
-	cd obj_musl && ../src_musl/configure $(FULL_MUSL_CONFIG)
+	cd obj_musl && $(CACHE_ENV) ../src_musl/configure $(FULL_MUSL_CONFIG)
 	touch $@
 
 obj_sysroot/.lc_headers: | obj_musl/.lc_configured obj_sysroot
-	cd obj_musl && $(MAKE) DESTDIR=$(CURDIR)/obj_sysroot install-headers
+	cd obj_musl && $(CACHE_ENV) $(MAKE) DESTDIR=$(CURDIR)/obj_sysroot install-headers
 	touch $@
 
 obj_gcc/$(TARGET)/libgcc/libgcc.a: | obj_sysroot/.lc_headers
-	cd obj_gcc && $(MAKE) MAKE="$(MAKE) enable_shared=no $(LIBTOOL_ARG)" all-target-libgcc
+	cd obj_gcc && $(CACHE_ENV) $(MAKE) STAGE_CC_WRAPPER="$(CCACHE_LAUNCHER)" \
+		MAKE="$(MAKE) enable_shared=no $(LIBTOOL_ARG)" all-target-libgcc
 
 obj_musl/.lc_built: | obj_musl/.lc_configured
-	cd obj_musl && $(MAKE) $(MUSL_VARS)
+	cd obj_musl && $(CACHE_ENV) $(MAKE) $(MUSL_VARS)
 	touch $@
 
 obj_sysroot/.lc_libs: | obj_musl/.lc_built
-	cd obj_musl && $(MAKE) $(MUSL_VARS) DESTDIR=$(CURDIR)/obj_sysroot install
+	cd obj_musl && $(CACHE_ENV) $(MAKE) $(MUSL_VARS) DESTDIR=$(CURDIR)/obj_sysroot install
 	touch $@
 
 obj_gcc/.lc_built: | obj_gcc/.lc_configured obj_gcc/gcc/.lc_built
-	cd obj_gcc && $(MAKE) MAKE="$(MAKE) $(LIBTOOL_ARG)"
+	cd obj_gcc && $(CACHE_ENV) $(MAKE) STAGE_CC_WRAPPER="$(CCACHE_LAUNCHER)" MAKE="$(MAKE) $(LIBTOOL_ARG)"
 	touch $@
 
 install-musl: | obj_musl/.lc_built
-	cd obj_musl && $(MAKE) $(MUSL_VARS) DESTDIR=$(DESTDIR)$(OUTPUT)$(SYSROOT) install
+	cd obj_musl && $(CACHE_ENV) $(MAKE) $(MUSL_VARS) DESTDIR=$(DESTDIR)$(OUTPUT)$(SYSROOT) install
 
 install-binutils: | obj_binutils/.lc_built
 	cd obj_binutils && $(MAKE) MAKE="$(MAKE) $(LIBTOOL_ARG)" DESTDIR=$(DESTDIR)$(OUTPUT) install
 
 install-gcc: | obj_gcc/.lc_built
-	cd obj_gcc && $(MAKE) MAKE="$(MAKE) $(LIBTOOL_ARG)" DESTDIR=$(DESTDIR)$(OUTPUT) install
+	cd obj_gcc && $(CACHE_ENV) $(MAKE) STAGE_CC_WRAPPER="$(CCACHE_LAUNCHER)" \
+		MAKE="$(MAKE) $(LIBTOOL_ARG)" DESTDIR=$(DESTDIR)$(OUTPUT) install
 	ln -sf $(TARGET)-gcc $(DESTDIR)$(OUTPUT)/bin/$(TARGET)-cc
 
 ifneq ($(LINUX_SRCDIR),)

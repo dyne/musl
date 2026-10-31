@@ -6,7 +6,9 @@ their limits.
 ## Validation
 
 The offline regression suite needs Python 3, PyYAML, GNU Make 4.3 or newer,
-curl, CMake, a host C compiler, file, and standard GNU utilities:
+curl, Git, CMake, host C/C++ compilers, file, and standard GNU utilities.
+Install host ccache to exercise the real cache-hit regression (CI requires it);
+`CCACHE_TEST_BINARY=/absolute/path/to/ccache make test` can select another binary:
 
 ```sh
 make test
@@ -23,6 +25,53 @@ dispatches. Every matrix target gets a clean compiler/library build, preparation
 and `make smoke` before its archive is uploaded. A failure does not cancel other
 targets, so their results remain available. Build output and configure logs are
 retained as artifacts for 90 days, including failed builds.
+
+## Compiler caching
+
+CI keeps a separate compressed 2 GiB cache for each target, Alpine branch and
+build flavor. Keys deliberately exclude commit and PR identifiers, allowing
+PRs to restore snapshots warmed on `master`. GitHub's cache access rules still
+apply: a PR's saved cache is available to that PR's reruns, not to other PRs or
+`master`. Master release builds restore master caches. Parallel snapshots are
+not merged, and the first build with a new key starts cold. This is GitHub
+Actions cache storage, not a remote ccache service.
+
+`CCACHE_DIR=$GITHUB_WORKSPACE/.cache/ccache` names the same bind-mounted directory
+on Ubuntu and inside Alpine. The chroot entry script explicitly preserves
+`CCACHE_*`, including `CCACHE_COMPILERCHECK=content`, compression and size limits.
+CI checks this configuration inside Alpine and restores runner ownership before
+the cache action saves the root-written files. Cache statistics and probes are
+retained with the build logs.
+
+Host compiler/binutils builds use ccache through `COMMON_CONFIG`. musl uses the
+in-tree xgcc through ccache; libgcc/libstdc++ use GCC's `STAGE_CC_WRAPPER` hook,
+preserving generated sysroot and compiler flags. Library builds also use ccache.
+`scripts/compiler-cache.sh` fingerprints the driver and C/C++ frontend contents
+once per build command and selects a cache namespace. This lets identical
+compiler contents survive timestamp changes while preventing different
+frontends from sharing results. The initial host GCC build precedes this helper
+because its xgcc/frontends do not exist yet. No unsafe timestamp sloppiness is set.
+
+For a local build with a host ccache:
+
+```sh
+export CCACHE_DIR="$PWD/.cache/ccache"
+export CCACHE_COMPILERCHECK=content
+export CCACHE_MAXSIZE=2G
+make prepare
+bash scripts/check-ccache.sh "${ARCH:-x86_64-linux-musl}"
+ccache --show-stats
+```
+
+The probe removes and recompiles tracked C and C++ objects twice with the
+in-tree drivers and requires actual hits. It runs for every CI target. Set
+`CCACHE_LAUNCHER=` on make to build without caching; use a host executable,
+not a foreign-target packaged ccache. Cache hits depend on matching compiler
+contents, source paths, flags and headers; an unchanged cache key does not
+guarantee reuse. See [GitHub cache scope](https://docs.github.com/en/actions/reference/workflows-and-actions/dependency-caching#restrictions-for-accessing-a-cache)
+and the [ccache manual](https://ccache.dev/manual/latest.html).
+
+## Package validation
 
 `make smoke ARCH=<tuple>` compiles C against curl, libssh2, LibreSSL, zlib and
 wide ncurses, plus C++20/thread/atomic/Kyoto Cabinet code. It checks ELF machine
@@ -47,12 +96,18 @@ and reconstruct it to avoid retaining obsolete headers and libraries.
 
 ## Sources and package changes
 
-`sources.urls` records one exact upstream HTTPS URL per manifest key. Compiler
+`sources.urls` records one exact upstream URL per manifest key. Compiler
 and library Make rules always resolve their downloads through this manifest.
 Packages use official release archives; config.sub comes directly from
-[GNU's repository at the pinned revision](https://cgit.git.savannah.gnu.org/cgit/config.git/plain/config.sub?id=3d5db9ebe8607382d17d60faf8853c944fc5f353).
-Use the canonical cgit host and full commit ID; the older redirecting host
-returned HTTP 404 on some CI runners.
+[GNU's Git repository](https://git.savannah.gnu.org/git/config.git).
+For a single pinned file, the manifest syntax is
+`git+https://REPOSITORY.git#FULL_40_HEX_COMMIT:relative/path`.
+The downloader shallow-fetches that exact commit into a private temporary bare
+repository and reads the blob, avoiding the cgit HTTP frontend that intermittently
+returned 404 even with a full revision. Git and `timeout` are required for fresh
+Git inputs. Fetches have a 120-second limit and at most three attempts; revision,
+file type and SHA-256 are checked before publishing. Temporary state is removed
+on failure. Use a full commit, not a branch/tag or abbreviated revision.
 Its bytes match the previously pinned SHA-256, so this routing change does not
 change the helper or any package version. There is no source-mirror upload
 prerequisite, source-cache service dependency or fallback on HTTP/integrity errors.
@@ -69,7 +124,7 @@ a manifest key and URL manifest. An empty URL selects the key from the URL
 manifest; an explicit URL takes precedence. Existing files are verified on each build; corrupt caches fail
 closed. Remove only the identified corrupt cache entry before retrying. New
 downloads go into a private temporary file beside the destination and are moved
-into place only after HTTP success and checksum verification.
+into place only after transport success and checksum verification.
 
 Compiler downloads use `gcc-musl/sources/`; library downloads use
 `.cache/sources/`. `gcc-musl/sources/GNUmakefile` delegates to the compiler's
@@ -83,7 +138,9 @@ add the filename's legacy `gcc-musl/hashes/*.sha1` catalog entry and its stronge
 still identify supported archive names; SHA-256 enforces build-time integrity.
 For config.sub, the manifest key includes `CONFIG_SUB_REV` even though the cached
 filename is `config.sub`. A changed revision requires replacing the old cached
-config.sub with the verified new one.
+config.sub with the verified new one. Update the full commit in the Git URL and
+the revision key/configuration together; hash the exact blob bytes, not an
+archive of the repository.
 
 For libraries, update the version/archive variables in `libs/GNUmakefile`,
 `sources.urls` and the SHA-256 manifest. Use the upstream release archive URL;
