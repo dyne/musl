@@ -122,6 +122,8 @@ config.sub revision **3d5db9ebe860**. Check both configuration variants and base
 Makefile when updating; ISL is unselected. C/C++ are enabled. The default host
 tools use static linking, -Os and x86-64-v2; NLS, sanitizer, mudflap and LTO are
 disabled. Host ccache is used when available.
+Both flavors build musl's static archive with `-fPIC` for static-PIE linkage;
+PIE applications must compile their own objects with `-fPIE` too.
 
 Bundled versions in `libs/GNUmakefile`: LibreSSL **4.4.0**, zlib-ng **2.3.3**,
 curl **8.23.0**, libssh2 **1.11.1**, ccache **4.14.2**, ncurses **6.6**, Kyoto

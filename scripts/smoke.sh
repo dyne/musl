@@ -18,8 +18,8 @@ for library in ssl crypto z curl ssh2 ncursesw kyotocabinet; do
 done
 test -x "$target/bin/ccache"
 "$compiler/bin/$arch-gcc" -static -Os tests/toolchain.c -o "$build/toolchain"
-"$compiler/bin/$arch-gcc" -static-pie -Os tests/toolchain.c -o "$build/static-pie"
-"$compiler/bin/$arch-gcc" -static -pie -Os tests/toolchain.c -o "$build/static-and-pie"
+"$compiler/bin/$arch-gcc" -static-pie -fPIE -Os tests/toolchain.c -o "$build/static-pie"
+"$compiler/bin/$arch-gcc" -static -pie -fPIE -Os tests/toolchain.c -o "$build/static-and-pie"
 "$compiler/bin/$arch-gcc" -static -Os -I"$target/include" tests/smoke.c \
     -L"$target/lib" -lcurl -lssh2 -lssl -lcrypto -lz -lncursesw -lpthread -o "$build/c"
 "$compiler/bin/$arch-g++" -static -Os -std=c++20 -I"$target/include" tests/smoke.cpp \

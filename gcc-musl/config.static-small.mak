@@ -6,6 +6,8 @@ OUTPUT = $(PREFIX)
 GCC_VER = 16.2.0
 BINUTILS_VER = 2.47
 LINUX_VER = 7.3.1
+# Static PIE needs position-independent objects inside libc.a as well.
+MUSL_CONFIG += CFLAGS="-fPIC"
 COMMON_CONFIG += CFLAGS="-g0 -Os -march=x86-64-v2"
 COMMON_CONFIG += CXXFLAGS="-g0 -Os -march=x86-64-v2"
 # -march=x86-64-v2 -march=haswell

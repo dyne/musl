@@ -173,6 +173,12 @@ an independent signature-verification claim. The unchanged inputs retain
 their previously verified digests. Linux's version selects API headers, not a
 kernel image or a blanket minimum runtime kernel requirement.
 
+The update's static-PIE smoke check exposed a pre-existing gap: the patched GCC
+link specs alone cannot link non-PIC objects in `libc.a` into a PIE. Both Dyne
+flavors now configure musl with `CFLAGS=-fPIC`. Applications must also compile
+PIE objects with `-fPIE`; smoke checks link and inspect both `-static-pie` and
+`-static -pie`, and execute them on the native target.
+
 ccache's optional third-party source downloads are version/hash-pinned by the
 upstream build scripts inside its verified release archive. They are separate
 from this repository's top-level source mirror.
