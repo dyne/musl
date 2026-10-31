@@ -47,8 +47,16 @@ and reconstruct it to avoid retaining obsolete headers and libraries.
 
 ## Sources and package changes
 
-`scripts/download.sh` accepts URL, destination, SHA-256 manifest and optionally
-a manifest key. Existing files are verified on each build; corrupt caches fail
+`sources.urls` records one exact HTTPS URL per manifest key. Builds use it by
+default, so adopting a release does not depend on a prior source-mirror upload.
+`SOURCES_URL=https://files.dyne.org/musl/sources` overrides all locations for a
+populated mirror. It must contain byte-identical archives; there is no silent
+fallback on HTTP or integrity failures. The pinned config.sub helper continues
+to use the Dyne mirror rather than following an unpinned upstream branch.
+
+`scripts/download.sh` accepts URL, destination, SHA-256 manifest, optionally
+a manifest key and URL manifest. An empty URL selects the key from the URL
+manifest; an explicit URL takes precedence. Existing files are verified on each build; corrupt caches fail
 closed. Remove only the identified corrupt cache entry before retrying. New
 downloads go into a private temporary file beside the destination and are moved
 into place only after HTTP success and checksum verification.
@@ -67,8 +75,9 @@ For config.sub, the manifest key includes `CONFIG_SUB_REV` even though the cache
 filename is `config.sub`. A changed revision requires replacing the old cached
 config.sub with the verified new one.
 
-For libraries, update the version/archive variables in `libs/GNUmakefile` and
-the SHA-256 manifest, then publish the exact archive to the source mirror.
+For libraries, update the version/archive variables in `libs/GNUmakefile`,
+`sources.urls` and the SHA-256 manifest. If maintaining the source mirror,
+publish the exact archive there too.
 Adapt extraction or build options if upstream packaging changed. Add a new
 library's installed-file target and its prerequisite edges to the build graph;
 ensure the smoke test actually links its API. Update the public component list.
@@ -91,6 +100,78 @@ available before accepting new pins.
 | ccache | https://github.com/ccache/ccache/releases |
 | ncurses | https://ftp.gnu.org/gnu/ncurses/ |
 | Kyoto Cabinet | https://dbmx.net/kyotocabinet/pkg/ |
+
+### Repeatable upstream update procedure
+
+1. Record the date and check **stable releases** on each project's official
+   website, release listing or API. Do not guess version numbers, use snapshots
+   or assume GitHub tags are releases. Check unchanged packages too. For GitHub
+   releases, for example:
+
+   ```sh
+   gh api repos/zlib-ng/zlib-ng/releases/latest --jq '{tag: .tag_name, prerelease, url: .html_url}'
+   gh api repos/ccache/ccache/releases/latest --jq '{tag: .tag_name, prerelease, url: .html_url}'
+   gh api repos/libssh2/libssh2/releases/latest --jq '{tag: .tag_name, prerelease, url: .html_url}'
+   ```
+
+2. Follow the actual release download links. Download into an ignored staging
+   directory using `curl --fail --location --output <temporary> <exact-url>`.
+   Compare published hashes or verify release signatures against upstream key
+   fingerprints where available, then compute `sha256sum` of those exact bytes.
+   Record the verification method and any signature-verification limitation.
+   Renaming an archive is safe; repacking it changes the digest. In particular,
+   zlib-ng's GitHub tag archive has a numeric URL but a `zlib-ng-VERSION` root;
+   ccache's release asset is different from its GitHub-generated tag archive.
+3. Update `sources.urls` and `sources.sha256` together. Update the compiler base
+   pins and **both** `config.*.mak` variants, or the library variables. Add one
+   supported `hashes/<archive>.sha1` entry for each selected compiler input.
+   Choose an archive format upstream actually provides (MPC 1.4.1 uses xz).
+   New Linux major versions need the corresponding `LINUX_SITE/vN.x` rule.
+4. Compare pristine sources with every old version-specific patch. Preserve
+   needed changes, drop already-integrated fixes, and record why in
+   `gcc-musl/patches/README.md`. Check upstream musl-cross-make for post-release
+   libc fixes. Keep patch provenance at an exact commit. Verify the full patch
+   sequence without fuzz, then exercise the real cowpatch/extraction build.
+   Do not run a whole-project `clean` while another target is building.
+5. Run `make test` and ShellCheck, then `make -C libs fetch` and compiler
+   `fetch-sources`. These verify caches; they never bless changed bytes by
+   recomputing the committed hashes. A corrupt entry must be removed explicitly.
+   Run clean compiler/library builds for all four targets, `make prepare`,
+   `make smoke`, and archive checks. A library-only build with an old compiler
+   does not validate a toolchain update. Native execution and foreign linking
+   are different evidence; record which actually ran.
+6. Update the component lists in `AGENTS.md` and `docs/readme.md`, and record
+   build evidence and limitations. The offline source inventory check catches
+   missing URLs/checksums/compiler catalog entries in either build flavor.
+   PR CI runs the complete Alpine matrix; publish only after it passes.
+
+### Stable releases checked on 2026-10-31
+
+| Component / official release listing | Previous | Selected |
+| --- | --- | --- |
+| [GCC](https://gcc.gnu.org/) | 15.1.0 | 16.2.0 |
+| [binutils](https://sourceware.org/binutils/) | 2.44 | 2.47 |
+| [musl](https://musl.libc.org/releases.html) | 1.2.5 | 1.2.6 + upstream fixes |
+| [Linux headers](https://www.kernel.org/) | 5.8.5 | 7.3.1 |
+| [GMP](https://gmplib.org/) | 6.1.2 | 6.3.0 |
+| [MPC](https://www.multiprecision.org/mpc/) | 1.1.0 | 1.4.1 |
+| [MPFR](https://www.mpfr.org/mpfr-current/) | 4.0.2 | 4.2.2 |
+| [LibreSSL](https://www.libressl.org/) | 4.1.0 | 4.4.0 |
+| [zlib-ng](https://github.com/zlib-ng/zlib-ng/releases/latest) | 2.2.4 | 2.3.3 |
+| [curl](https://curl.se/download.html) | 8.15.0 | 8.23.0 |
+| [ccache](https://ccache.dev/) | 4.11.3 | 4.14.2 |
+| [libssh2](https://github.com/libssh2/libssh2/releases/latest) | 1.11.1 | 1.11.1 (unchanged) |
+| [ncurses](https://invisible-island.net/ncurses/announce.html) | 6.6 | 6.6 (unchanged) |
+| [Kyoto Cabinet](https://dbmx.net/kyotocabinet/pkg/) | 1.2.80 | 1.2.80 (unchanged) |
+
+For this update, new archives were downloaded from their exact upstream HTTPS
+URLs. LibreSSL was compared with OpenBSD's published `SHA256`, Linux with
+kernel.org's `sha256sums.asc`, and ccache with the release asset's SHA-256 in
+GitHub's API. GnuPG is unavailable locally, so detached release signatures were
+not verified. The other new digests pin the upstream HTTPS bytes; they are not
+an independent signature-verification claim. The unchanged inputs retain
+their previously verified digests. Linux's version selects API headers, not a
+kernel image or a blanket minimum runtime kernel requirement.
 
 ccache's optional third-party source downloads are version/hash-pinned by the
 upstream build scripts inside its verified release archive. They are separate

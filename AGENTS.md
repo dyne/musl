@@ -35,7 +35,7 @@ before making claims about what is currently published.
 | `gcc-musl/config.mak.dist`, `presets/` | Upstream examples; presets are inside gcc-musl |
 | `gcc-musl/hashes/`, `gcc-musl/patches/` | Supported archive names and version-specific patches |
 | `gcc-musl/sources/GNUmakefile` | Delegates fetching to the selected compiler configuration |
-| `sources.sha256`, `scripts/download.sh` | Pinned integrity checks for new and cached inputs |
+| `sources.urls`, `sources.sha256`, `scripts/download.sh` | Exact upstream URLs and integrity checks for new and cached inputs |
 | `scripts/toolchain-state.sh` | Invalidates selected compiler build/install state when inputs change |
 | `libs/GNUmakefile` | Library versions, dependency graph, per-target sources and installation |
 | `settings.cmake` | Consumer/internal cross-compilation settings |
@@ -116,15 +116,15 @@ builds in the same checkout; they share the selected config symlink and sources.
 
 ## Pinned inputs and updates
 
-Current default compiler inputs: GCC **15.1.0**, binutils **2.44**, musl **1.2.5**,
-Linux headers **5.8.5**, GMP **6.1.2**, MPC **1.1.0**, MPFR **4.0.2** and
+Current default compiler inputs: GCC **16.2.0**, binutils **2.47**, musl **1.2.6**,
+Linux headers **7.3.1**, GMP **6.3.0**, MPC **1.4.1**, MPFR **4.2.2** and
 config.sub revision **3d5db9ebe860**. Check both configuration variants and base
 Makefile when updating; ISL is unselected. C/C++ are enabled. The default host
 tools use static linking, -Os and x86-64-v2; NLS, sanitizer, mudflap and LTO are
 disabled. Host ccache is used when available.
 
-Bundled versions in `libs/GNUmakefile`: LibreSSL **4.1.0**, zlib-ng **2.2.4**,
-curl **8.15.0**, libssh2 **1.11.1**, ccache **4.11.3**, ncurses **6.6**, Kyoto
+Bundled versions in `libs/GNUmakefile`: LibreSSL **4.4.0**, zlib-ng **2.3.3**,
+curl **8.23.0**, libssh2 **1.11.1**, ccache **4.14.2**, ncurses **6.6**, Kyoto
 Cabinet **1.2.80**. LibreSSL provides OpenSSL-compatible crypto; zlib-ng uses
 zlib compatibility mode. curl explicitly depends on SSL, zlib and SSH2.
 ncurses builds its wide-character static library without host-tic-dependent
@@ -133,13 +133,21 @@ Kyoto disables zlib and respects selected compile flags instead of upstream's
 automatic -march=native/-O2 additions. Packaged ccache targets ARCH and is not a
 substitute for the x86_64 host ccache during cross-compilation.
 
+Versions were checked against upstream stable releases on 2026-10-31; recheck
+on every update. Linux supplies userspace headers, not a shipped kernel.
 For upgrades, compare upstream richfelker/musl-cross-make with `gcc-musl/`,
 preserving Dyne's wrapper. Update configuration/default pins, supported archive
-catalog entries in hashes, SHA-256 pins, and version-specific patches. musl 1.2.5
-currently carries two CVE-2025-26519 patches; check upstream integration before
-dropping them. Mirror exact verified archives before release and update docs.
+catalog entries in hashes, URL/SHA-256 pins, and version-specific patches.
+Musl 1.2.6 integrates the old CVE-2025-26519 patches and carries the three newer
+upstream fixes for CVE-2026-107891, CVE-2026-40200 and CVE-2026-6042.
+Read `gcc-musl/patches/README.md` for the patch-port record. Publish exact
+verified archives to the source mirror when maintaining that service, and update docs.
 There is no download_from_dyne.sh and no second explicit source manifest.
 
+Builds default to exact URLs in `sources.urls`; the pinned config.sub helper
+still uses Dyne's mirror. `SOURCES_URL=https://files.dyne.org/musl/sources`
+overrides archive locations for a populated mirror. There is no automatic
+version selection or fallback that changes accepted bytes.
 All selected compiler inputs and library caches are SHA-256 checked on builds.
 New downloads fail on HTTP errors and publish only after verification. Corrupt
 existing inputs fail closed; remove the identified entry before retrying.
@@ -167,7 +175,8 @@ checks cache failure paths, real Make rebuild/order behavior, cleanup, CMake,
 preparation, checksums and tag identity. For changed recipes, also run actual
 clean target builds. `make smoke` links C against all bundled C libraries and
 C++20/thread/atomic/Kyoto code, checks ELF architecture/static dependencies, and
-runs x86_64 binaries on compatible hosts. Foreign runtime behavior needs hardware
+runs x86_64 binaries on compatible hosts. It also checks the ported static-PIE
+link specs and libc sorting/GB18030/regex functionality. Foreign runtime behavior needs hardware
 or emulation. Never infer full build success from lint or cross-linking alone.
 The [validation report](docs/validation.md) records the initial 28-test result,
 fresh native bootstrap, four target library/package checks, and remaining

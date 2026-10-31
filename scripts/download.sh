@@ -1,9 +1,10 @@
 #!/bin/sh
-# Usage: sh download.sh URL DESTINATION SHA256_MANIFEST [MANIFEST_KEY]
+# An empty URL selects MANIFEST_KEY from URL_MANIFEST.
+# Usage: sh download.sh URL DESTINATION SHA256_MANIFEST [MANIFEST_KEY [URL_MANIFEST]]
 # Verify cached files too. Never publish an incomplete or unverified download.
 set -eu
-if [ "$#" -lt 3 ] || [ "$#" -gt 4 ]; then
-    echo 'Usage: download.sh URL DESTINATION SHA256_MANIFEST [MANIFEST_KEY]' >&2
+if [ "$#" -lt 3 ] || [ "$#" -gt 5 ]; then
+    echo 'Usage: download.sh URL DESTINATION SHA256_MANIFEST [MANIFEST_KEY [URL_MANIFEST]]' >&2
     exit 2
 fi
 url=$1
@@ -26,6 +27,13 @@ if [ -e "$destination" ]; then
         exit 1
     }
     exit 0
+fi
+if [ -z "$url" ]; then
+    url_manifest=${5:?An empty URL requires a URL manifest}
+    url=$(awk -v key="$key" '$1 == key { url=$2; count++ } END {
+        if (count != 1 || url !~ /^https?:\/\//) exit 1;
+        print url
+    }' "$url_manifest") || { echo "Missing or invalid source URL entry: $key" >&2; exit 1; }
 fi
 mkdir -p "$(dirname "$destination")"
 temporary=$(mktemp "$destination.tmp.XXXXXX")

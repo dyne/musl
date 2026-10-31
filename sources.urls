@@ -1,0 +1,15 @@
+config.sub.3d5db9ebe860 https://files.dyne.org/musl/sources/config.sub
+binutils-2.47.tar.xz https://ftp.gnu.org/gnu/binutils/binutils-2.47.tar.xz
+gcc-16.2.0.tar.xz https://ftp.gnu.org/gnu/gcc/gcc-16.2.0/gcc-16.2.0.tar.xz
+gmp-6.3.0.tar.xz https://ftp.gnu.org/gnu/gmp/gmp-6.3.0.tar.xz
+linux-7.3.1.tar.xz https://cdn.kernel.org/pub/linux/kernel/v7.x/linux-7.3.1.tar.xz
+mpc-1.4.1.tar.xz https://ftp.gnu.org/gnu/mpc/mpc-1.4.1.tar.xz
+mpfr-4.2.2.tar.xz https://ftp.gnu.org/gnu/mpfr/mpfr-4.2.2.tar.xz
+musl-1.2.6.tar.gz https://musl.libc.org/releases/musl-1.2.6.tar.gz
+libressl-4.4.0.tar.gz https://ftp.openbsd.org/pub/OpenBSD/LibreSSL/libressl-4.4.0.tar.gz
+zlib-ng-2.3.3.tar.gz https://github.com/zlib-ng/zlib-ng/archive/refs/tags/2.3.3.tar.gz
+curl-8.23.0.tar.xz https://curl.se/download/curl-8.23.0.tar.xz
+libssh2-1.11.1.tar.xz https://libssh2.org/download/libssh2-1.11.1.tar.xz
+ccache-4.14.2.tar.xz https://github.com/ccache/ccache/releases/download/v4.14.2/ccache-4.14.2.tar.xz
+ncurses-6.6.tar.gz https://ftp.gnu.org/gnu/ncurses/ncurses-6.6.tar.gz
+kyotocabinet-1.2.80.tar.gz https://dbmx.net/kyotocabinet/pkg/kyotocabinet-1.2.80.tar.gz
