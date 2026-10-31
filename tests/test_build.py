@@ -41,10 +41,13 @@ class Downloads(Workspace):
         self.manifest.write_text(hashlib.sha256(self.payload).hexdigest() + "  source.tar.gz\n")
         self.dest = self.work / "directory with spaces/source.tar.gz"
         payload = self.payload
+        self.requests = []
+        requests = self.requests
 
         class Handler(http.server.BaseHTTPRequestHandler):
             def do_GET(self):
-                self.send_response(404 if self.path == "/missing" else 200)
+                requests.append(self.path)
+                self.send_response(404 if self.path.startswith("/missing") else 200)
                 self.end_headers()
                 self.wfile.write(b"wrong bytes" if self.path == "/wrong" else payload)
 
@@ -118,6 +121,33 @@ class Downloads(Workspace):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("Missing or invalid source URL entry", result.stdout)
             self.assertFalse(self.dest.exists())
+
+    def test_make_fetches_compiler_and_libraries_from_manifest_without_legacy_mirror(self):
+        # Run the actual Make download rules against an empty source tree.
+        for directory, filename in [("gcc-musl", "Makefile"), ("libs", "GNUmakefile")]:
+            (self.work / directory).mkdir()
+            shutil.copy(ROOT / directory / filename, self.work / directory / filename)
+        shutil.copytree(ROOT / "gcc-musl/hashes", self.work / "gcc-musl/hashes")
+        shutil.copytree(ROOT / "scripts", self.work / "scripts")
+        names = [line.split()[0] for line in (ROOT / "sources.urls").read_text().splitlines()]
+        digest = hashlib.sha256(self.payload).hexdigest()
+        self.manifest.write_text("".join(f"{digest}  {name}\n" for name in names))
+        base = f"http://127.0.0.1:{self.server.server_port}"
+        urls = self.work / "sources.urls"
+        urls.write_text("".join(f"{name} {base}/upstream/{name}\n" for name in names))
+        gcc_archive = next(name for name in names if name.startswith("gcc-"))
+        self.ok(run("make", "-C", "gcc-musl", "sources/config.sub", "sources/" + gcc_archive,
+                    "SOURCES_URL=" + base + "/missing", cwd=self.work))
+        for directory, target in [("gcc-musl", "fetch-sources"), ("libs", "fetch")]:
+            self.ok(run("make", "-C", directory, target, "SOURCES_URL=" + base + "/missing",
+                        cwd=self.work))
+        self.assertEqual(sorted(self.requests), sorted("/upstream/" + name for name in names))
+        self.assertEqual((self.work / "gcc-musl/sources/config.sub").read_bytes(), self.payload)
+        before = list(self.requests)
+        for directory, target in [("gcc-musl", "fetch-sources"), ("libs", "fetch")]:
+            self.ok(run("make", "-C", directory, target, "SOURCES_URL=" + base + "/missing",
+                        cwd=self.work))
+        self.assertEqual(self.requests, before)  # Verified local cache needs no network.
 
 
 class LibraryBuilds(Workspace):
@@ -248,6 +278,7 @@ class ToolchainState(Workspace):
         self.assertEqual(set(urls), set(digests))
         self.assertTrue(all(re.fullmatch(r"[0-9a-f]{64}", digest) for digest in digests.values()))
         self.assertTrue(all(url.startswith("https://") for url in urls.values()))
+        self.assertTrue(all("files.dyne.org" not in url for url in urls.values()))
         probe = self.work / "sources.mk"
         probe.write_text('show-sources:\n\t@printf "%s\\n" $(ARCHIVES) config.sub.$(CONFIG_SUB_REV)\n')
         for flavor in ["static-small", "shared-optim"]:

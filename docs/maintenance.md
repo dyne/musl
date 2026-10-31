@@ -47,12 +47,20 @@ and reconstruct it to avoid retaining obsolete headers and libraries.
 
 ## Sources and package changes
 
-`sources.urls` records one exact HTTPS URL per manifest key. Builds use it by
-default, so adopting a release does not depend on a prior source-mirror upload.
-`SOURCES_URL=https://files.dyne.org/musl/sources` overrides all locations for a
-populated mirror. It must contain byte-identical archives; there is no silent
-fallback on HTTP or integrity failures. The pinned config.sub helper continues
-to use the Dyne mirror rather than following an unpinned upstream branch.
+`sources.urls` records one exact upstream HTTPS URL per manifest key. Compiler
+and library Make rules always resolve their downloads through this manifest.
+Packages use official release archives; config.sub comes directly from
+[GNU's repository at the pinned revision](https://git.savannah.gnu.org/cgit/config.git/plain/config.sub?id=3d5db9ebe860).
+Its bytes match the previously pinned SHA-256, so this routing change does not
+change the helper or any package version. There is no source-mirror upload
+prerequisite, source-cache service dependency or fallback on HTTP/integrity errors.
+
+The old `SOURCES_URL` mirror override has been removed; setting it no longer
+changes build downloads. For a test fixture or deliberately managed source
+location, supply a complete `SOURCE_URLS=/absolute/path/to/urls` manifest instead;
+the committed checksums still apply. Local caches are retained and reverified,
+so repeat builds do not redownload intact inputs. These cache directories are
+local build state, separate from the removed remote source-cache dependency.
 
 `scripts/download.sh` accepts URL, destination, SHA-256 manifest, optionally
 a manifest key and URL manifest. An empty URL selects the key from the URL
@@ -76,8 +84,8 @@ filename is `config.sub`. A changed revision requires replacing the old cached
 config.sub with the verified new one.
 
 For libraries, update the version/archive variables in `libs/GNUmakefile`,
-`sources.urls` and the SHA-256 manifest. If maintaining the source mirror,
-publish the exact archive there too.
+`sources.urls` and the SHA-256 manifest. Use the upstream release archive URL;
+no Dyne source-cache publication is needed.
 Adapt extraction or build options if upstream packaging changed. Add a new
 library's installed-file target and its prerequisite edges to the build graph;
 ensure the smoke test actually links its API. Update the public component list.
@@ -126,7 +134,7 @@ available before accepting new pins.
    pins and **both** `config.*.mak` variants, or the library variables. Add one
    supported `hashes/<archive>.sha1` entry for each selected compiler input.
    Choose an archive format upstream actually provides (MPC 1.4.1 uses xz).
-   New Linux major versions need the corresponding `LINUX_SITE/vN.x` rule.
+   For a new Linux major version, use the corresponding upstream `vN.x` URL.
 4. Compare pristine sources with every old version-specific patch. Preserve
    needed changes, drop already-integrated fixes, and record why in
    `gcc-musl/patches/README.md`. Check upstream musl-cross-make for post-release

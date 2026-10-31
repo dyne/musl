@@ -10,26 +10,9 @@ MPC_VER = 1.4.1
 MPFR_VER = 4.2.2
 LINUX_VER = 7.3.1
 
-GNU_SITE = https://ftpmirror.gnu.org/gnu
-GCC_SITE = $(GNU_SITE)/gcc
-BINUTILS_SITE = $(GNU_SITE)/binutils
-GMP_SITE = $(GNU_SITE)/gmp
-MPC_SITE = $(GNU_SITE)/mpc
-MPFR_SITE = $(GNU_SITE)/mpfr
-ISL_SITE = https://downloads.sourceforge.net/project/libisl/
-
-MUSL_SITE = https://musl.libc.org/releases
 MUSL_REPO = https://git.musl-libc.org/git/musl
 
-LINUX_SITE = https://cdn.kernel.org/pub/linux/kernel
-LINUX_HEADERS_SITE = https://ftp.barfooze.de/pub/sabotage/tarballs/
-
-DL_CMD = wget -c -O
-SHA1_CMD = sha1sum -c
-
-SOURCES_URL ?=
 SOURCE_URLS ?= $(abspath ../sources.urls)
-source_url = $(if $(SOURCES_URL),$(SOURCES_URL)/$(1))
 CHECKSUMS ?= $(abspath ../sources.sha256)
 DOWNLOAD = sh $(abspath ../scripts/download.sh)
 
@@ -64,10 +47,10 @@ fetch-sources:
 		if [ "$(SOURCES)" != sources ] && [ ! -f "$(SOURCES)/$$archive" ]; then \
 			echo "Missing archive in immutable SOURCES: $$archive" >&2; exit 1; \
 		fi; \
-		$(DOWNLOAD) "$(if $(SOURCES_URL),$(SOURCES_URL)/$$archive)" "$(SOURCES)/$$archive" "$(CHECKSUMS)" "$$archive" "$(SOURCE_URLS)"; \
+		$(DOWNLOAD) "" "$(SOURCES)/$$archive" "$(CHECKSUMS)" "$$archive" "$(SOURCE_URLS)"; \
 	done
 	@test "$(SOURCES)" = sources || test -f "$(SOURCES)/config.sub"
-	$(DOWNLOAD) "$(call source_url,config.sub)" "$(SOURCES)/config.sub" "$(CHECKSUMS)" "config.sub.$(CONFIG_SUB_REV)" "$(SOURCE_URLS)"
+	$(DOWNLOAD) "" "$(SOURCES)/config.sub" "$(CHECKSUMS)" "config.sub.$(CONFIG_SUB_REV)" "$(SOURCE_URLS)"
 
 print-config:
 	@$(foreach key,ARCH TARGET HOST GCC_VER BINUTILS_VER MUSL_VER LINUX_VER GMP_VER MPC_VER MPFR_VER ISL_VER CONFIG_SUB_REV COMMON_CONFIG GCC_CONFIG MUSL_CONFIG BINUTILS_CONFIG TOOLCHAIN_CONFIG,printf '%s\n' '$(key)=$($(key))';)
@@ -84,29 +67,14 @@ distclean: clean
 
 ifeq ($(SOURCES),sources)
 
-$(patsubst hashes/%.sha1,$(SOURCES)/%,$(wildcard hashes/gmp*)): SITE = $(GMP_SITE)
-$(patsubst hashes/%.sha1,$(SOURCES)/%,$(wildcard hashes/mpc*)): SITE = $(MPC_SITE)
-$(patsubst hashes/%.sha1,$(SOURCES)/%,$(wildcard hashes/mpfr*)): SITE = $(MPFR_SITE)
-$(patsubst hashes/%.sha1,$(SOURCES)/%,$(wildcard hashes/isl*)): SITE = $(ISL_SITE)
-$(patsubst hashes/%.sha1,$(SOURCES)/%,$(wildcard hashes/binutils*)): SITE = $(BINUTILS_SITE)
-$(patsubst hashes/%.sha1,$(SOURCES)/%,$(wildcard hashes/gcc*)): SITE = $(GCC_SITE)/$(basename $(basename $(notdir $@)))
-$(patsubst hashes/%.sha1,$(SOURCES)/%,$(wildcard hashes/musl*)): SITE = $(MUSL_SITE)
-$(patsubst hashes/%.sha1,$(SOURCES)/%,$(wildcard hashes/linux-7*)): SITE = $(LINUX_SITE)/v7.x
-$(patsubst hashes/%.sha1,$(SOURCES)/%,$(wildcard hashes/linux-6*)): SITE = $(LINUX_SITE)/v6.x
-$(patsubst hashes/%.sha1,$(SOURCES)/%,$(wildcard hashes/linux-5*)): SITE = $(LINUX_SITE)/v5.x
-$(patsubst hashes/%.sha1,$(SOURCES)/%,$(wildcard hashes/linux-4*)): SITE = $(LINUX_SITE)/v4.x
-$(patsubst hashes/%.sha1,$(SOURCES)/%,$(wildcard hashes/linux-3*)): SITE = $(LINUX_SITE)/v3.x
-$(patsubst hashes/%.sha1,$(SOURCES)/%,$(wildcard hashes/linux-2.6*)): SITE = $(LINUX_SITE)/v2.6
-$(patsubst hashes/%.sha1,$(SOURCES)/%,$(wildcard hashes/linux-headers-*)): SITE = $(LINUX_HEADERS_SITE)
-
 $(SOURCES):
 	mkdir -p $@
 
 $(SOURCES)/config.sub: | $(SOURCES)
-	$(DOWNLOAD) "$(call source_url,config.sub)" "$@" "$(CHECKSUMS)" "config.sub.$(CONFIG_SUB_REV)" "$(SOURCE_URLS)"
+	$(DOWNLOAD) "" "$@" "$(CHECKSUMS)" "config.sub.$(CONFIG_SUB_REV)" "$(SOURCE_URLS)"
 
 $(SOURCES)/%: hashes/%.sha1 | $(SOURCES)
-	$(DOWNLOAD) "$(call source_url,$(notdir $@))" "$@" "$(CHECKSUMS)" "$(notdir $@)" "$(SOURCE_URLS)"
+	$(DOWNLOAD) "" "$@" "$(CHECKSUMS)" "$(notdir $@)" "$(SOURCE_URLS)"
 
 endif
 

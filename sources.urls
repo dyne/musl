@@ -1,4 +1,4 @@
-config.sub.3d5db9ebe860 https://files.dyne.org/musl/sources/config.sub
+config.sub.3d5db9ebe860 https://git.savannah.gnu.org/cgit/config.git/plain/config.sub?id=3d5db9ebe860
 binutils-2.47.tar.xz https://ftp.gnu.org/gnu/binutils/binutils-2.47.tar.xz
 gcc-16.2.0.tar.xz https://ftp.gnu.org/gnu/gcc/gcc-16.2.0/gcc-16.2.0.tar.xz
 gmp-6.3.0.tar.xz https://ftp.gnu.org/gnu/gmp/gmp-6.3.0.tar.xz

@@ -142,14 +142,15 @@ preserving Dyne's wrapper. Update configuration/default pins, supported archive
 catalog entries in hashes, URL/SHA-256 pins, and version-specific patches.
 Musl 1.2.6 integrates the old CVE-2025-26519 patches and carries the three newer
 upstream fixes for CVE-2026-107891, CVE-2026-40200 and CVE-2026-6042.
-Read `gcc-musl/patches/README.md` for the patch-port record. Publish exact
-verified archives to the source mirror when maintaining that service, and update docs.
+Read `gcc-musl/patches/README.md` for the patch-port record, and update docs.
 There is no download_from_dyne.sh and no second explicit source manifest.
 
-Builds default to exact URLs in `sources.urls`; the pinned config.sub helper
-still uses Dyne's mirror. `SOURCES_URL=https://files.dyne.org/musl/sources`
-overrides archive locations for a populated mirror. There is no automatic
-version selection or fallback that changes accepted bytes.
+Every selected input comes directly from its upstream project using exact URLs
+in `sources.urls`: official release archives for packages and GNU's repository
+at revision `3d5db9ebe860` for config.sub. The old `SOURCES_URL` source-mirror
+override has been removed and is ignored. No build input depends on Dyne's
+source cache. There is no automatic version selection or mirror fallback.
+Local verified download caches remain available for repeat and offline builds.
 All selected compiler inputs and library caches are SHA-256 checked on builds.
 New downloads fail on HTTP errors and publish only after verification. Corrupt
 existing inputs fail closed; remove the identified entry before retrying.
