@@ -1,8 +1,9 @@
 {
-  "repositoryUrl": "git@github.com:dyne/musl.git",
+  "repositoryUrl": "https://github.com/dyne/musl.git",
+  "branches": ["master"],
+  "tagFormat": "v${version}",
   "plugins": [
     "@semantic-release/commit-analyzer",
-    "@semantic-release/release-notes-generator",
-    "@semantic-release/changelog"
+    "@semantic-release/release-notes-generator"
   ]
 }

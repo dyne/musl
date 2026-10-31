@@ -3,12 +3,12 @@ SOURCES = sources
 
 CONFIG_SUB_REV = 3d5db9ebe860
 BINUTILS_VER = 2.44
-GCC_VER = 9.4.0
+GCC_VER = 15.1.0
 MUSL_VER = 1.2.5
 GMP_VER = 6.1.2
 MPC_VER = 1.1.0
 MPFR_VER = 4.0.2
-LINUX_VER = headers-4.19.88-2
+LINUX_VER = 5.8.5
 
 GNU_SITE = https://ftpmirror.gnu.org/gnu
 GCC_SITE = $(GNU_SITE)/gcc
@@ -27,6 +27,10 @@ LINUX_HEADERS_SITE = https://ftp.barfooze.de/pub/sabotage/tarballs/
 DL_CMD = wget -c -O
 SHA1_CMD = sha1sum -c
 
+SOURCES_URL ?= https://files.dyne.org/musl/sources
+CHECKSUMS ?= $(abspath ../sources.sha256)
+DOWNLOAD = sh $(abspath ../scripts/download.sh)
+
 COWPATCH = $(CURDIR)/cowpatch.sh
 
 HOST = $(if $(NATIVE),$(TARGET))
@@ -37,6 +41,11 @@ REL_TOP = ../../..
 
 -include config.mak
 
+# ARCH is this wrapper's target tuple. Let leaf projects' own Makefiles set
+# their ARCH (musl needs x86_64, not x86_64-linux-musl). Keep it as an environment
+# default for this wrapper's config while demoting the command-line override.
+MAKEOVERRIDES := $(filter-out ARCH=%,$(MAKEOVERRIDES))
+
 SRC_DIRS = gcc-$(GCC_VER) binutils-$(BINUTILS_VER) musl-$(MUSL_VER) \
 	$(if $(GMP_VER),gmp-$(GMP_VER)) \
 	$(if $(MPC_VER),mpc-$(MPC_VER)) \
@@ -44,13 +53,28 @@ SRC_DIRS = gcc-$(GCC_VER) binutils-$(BINUTILS_VER) musl-$(MUSL_VER) \
 	$(if $(ISL_VER),isl-$(ISL_VER)) \
 	$(if $(LINUX_VER),linux-$(LINUX_VER))
 
-all:
+.PHONY: all install fetch-sources print-config clean distclean
+all: fetch-sources
+
+ARCHIVES = $(foreach dir,$(filter-out musl-git-%,$(SRC_DIRS)),$(notdir $(patsubst %.sha1,%,$(wildcard hashes/$(dir).tar.*.sha1))))
+fetch-sources:
+	@set -e; for archive in $(ARCHIVES); do \
+		if [ "$(SOURCES)" != sources ] && [ ! -f "$(SOURCES)/$$archive" ]; then \
+			echo "Missing archive in immutable SOURCES: $$archive" >&2; exit 1; \
+		fi; \
+		$(DOWNLOAD) "$(SOURCES_URL)/$$archive" "$(SOURCES)/$$archive" "$(CHECKSUMS)"; \
+	done
+	@test "$(SOURCES)" = sources || test -f "$(SOURCES)/config.sub"
+	$(DOWNLOAD) "$(SOURCES_URL)/config.sub" "$(SOURCES)/config.sub" "$(CHECKSUMS)" "config.sub.$(CONFIG_SUB_REV)"
+
+print-config:
+	@$(foreach key,ARCH TARGET HOST GCC_VER BINUTILS_VER MUSL_VER LINUX_VER GMP_VER MPC_VER MPFR_VER ISL_VER CONFIG_SUB_REV COMMON_CONFIG GCC_CONFIG MUSL_CONFIG BINUTILS_CONFIG TOOLCHAIN_CONFIG,printf '%s\n' '$(key)=$($(key))';)
 
 clean:
 	rm -rf gcc-* binutils-* musl-* gmp-* mpc-* mpfr-* isl-* build build-* linux-*
 
 distclean: clean
-	rm -rf sources
+	rm -f sources/config.sub sources/*.tar.*
 
 
 # Rules for downloading and verifying sources. Treat an external SOURCES path as
@@ -76,20 +100,10 @@ $(SOURCES):
 	mkdir -p $@
 
 $(SOURCES)/config.sub: | $(SOURCES)
-	mkdir -p $@.tmp
-	cd $@.tmp && $(DL_CMD) $(notdir $@) "https://git.savannah.gnu.org/gitweb/?p=config.git;a=blob_plain;f=config.sub;hb=$(CONFIG_SUB_REV)"
-	cd $@.tmp && touch $(notdir $@)
-	cd $@.tmp && $(SHA1_CMD) $(CURDIR)/hashes/$(notdir $@).$(CONFIG_SUB_REV).sha1
-	mv $@.tmp/$(notdir $@) $@
-	rm -rf $@.tmp
+	$(DOWNLOAD) "$(SOURCES_URL)/config.sub" "$@" "$(CHECKSUMS)" "config.sub.$(CONFIG_SUB_REV)"
 
 $(SOURCES)/%: hashes/%.sha1 | $(SOURCES)
-	mkdir -p $@.tmp
-	cd $@.tmp && $(DL_CMD) $(notdir $@) $(SITE)/$(notdir $@)
-	cd $@.tmp && touch $(notdir $@)
-	cd $@.tmp && $(SHA1_CMD) $(CURDIR)/hashes/$(notdir $@).sha1
-	mv $@.tmp/$(notdir $@) $@
-	rm -rf $@.tmp
+	$(DOWNLOAD) "$(SOURCES_URL)/$(notdir $@)" "$@" "$(CHECKSUMS)"
 
 endif
 
@@ -146,7 +160,10 @@ musl-git-%:
 # Add deps for all patched source dirs on their patchsets
 $(foreach dir,$(notdir $(basename $(basename $(basename $(wildcard hashes/*))))),$(eval $(dir): $$(wildcard patches/$(dir) patches/$(dir)/*)))
 
-extract_all: | $(SRC_DIRS)
+extract_all: fetch-sources
+	$(MAKE) extract-toolchain-sources
+
+extract-toolchain-sources: | $(SRC_DIRS)
 
 
 # Rules for building.
@@ -179,11 +196,14 @@ $(BUILD_DIR)/config.mak: | $(BUILD_DIR)
 	$(if $(LINUX_VER),"LINUX_SRCDIR = $(REL_TOP)/linux-$(LINUX_VER)") \
 	"-include $(REL_TOP)/config.mak"
 
-all: | $(SRC_DIRS) $(BUILD_DIR) $(BUILD_DIR)/Makefile $(BUILD_DIR)/config.mak
-	cd $(BUILD_DIR) && $(MAKE) $@
+all:
+	$(MAKE) build-toolchain
 
-install: | $(SRC_DIRS) $(BUILD_DIR) $(BUILD_DIR)/Makefile $(BUILD_DIR)/config.mak
-	cd $(BUILD_DIR) && $(MAKE) OUTPUT=$(OUTPUT) $@
+build-toolchain: | $(SRC_DIRS) $(BUILD_DIR) $(BUILD_DIR)/Makefile $(BUILD_DIR)/config.mak
+	cd $(BUILD_DIR) && $(MAKE) all
+
+install: all
+	cd $(BUILD_DIR) && $(MAKE) OUTPUT=$(OUTPUT) install
 
 endif
 

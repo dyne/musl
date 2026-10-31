@@ -1,10 +1,31 @@
-# Build base libs available in the toolchain
-
-# set externally to cross-compile for targets
-PREFIX ?= /opt/dyne
+# Target-local source/build directories prevent cross-target cache contamination.
+.DEFAULT_GOAL := all
+R := $(abspath ..)
 ARCH ?= x86_64-linux-musl
+PREFIX ?= $(R)/dyne/$(ARCH)
+T := $(abspath $(PREFIX))
+BUILD_ROOT ?= $(R)/build/libs
+B := $(BUILD_ROOT)/$(ARCH)
+SOURCE_CACHE ?= $(R)/.cache/sources
+SOURCES_URL ?= https://files.dyne.org/musl/sources
+CHECKSUMS ?= $(R)/sources.sha256
+TOOLCHAIN ?= $(R)/dyne/gcc-musl
+ifneq ($(filter / $(R) $(R)/dyne $(abspath $(TOOLCHAIN)),$(T)),)
+$(error PREFIX must be a dedicated target library directory)
+endif
+JOBS ?= $(shell nproc)
+CCACHE_LAUNCHER ?= $(shell command -v ccache 2>/dev/null)
+CC := $(CCACHE_LAUNCHER) $(TOOLCHAIN)/bin/$(ARCH)-gcc --static
+CXX := $(CCACHE_LAUNCHER) $(TOOLCHAIN)/bin/$(ARCH)-g++ --static
+AR := $(TOOLCHAIN)/bin/$(ARCH)-ar
+RANLIB := $(TOOLCHAIN)/bin/$(ARCH)-ranlib
+CFLAGS ?= -g0 -Os -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow
+CXXFLAGS ?= $(CFLAGS)
+LDFLAGS ?= -static
+export PKG_CONFIG_LIBDIR := $(T)/lib/pkgconfig
+export PKG_CONFIG_PATH :=
+export PKG_CONFIG_SYSROOT_DIR :=
 
-# versions available on files.dyne.org
 LIBSSL ?= libressl-4.1.0
 ZLIB ?= zlib-ng-2.2.4
 CURL ?= curl-8.15.0
@@ -12,140 +33,109 @@ SSH2 ?= libssh2-1.11.1
 CCACHE ?= ccache-4.11.3
 NCURSES ?= ncurses-6.6
 KYOTOCAB ?= kyotocabinet-1.2.80
-# files.dyne.org URLs
-SOURCES_URL := https://files.dyne.org/musl/sources/
 
-R  := $(shell dirname $(CURDIR))
-T  := $(R)/dyne/$(ARCH)
+PACKAGES := $(LIBSSL) $(ZLIB) $(CURL) $(SSH2) $(CCACHE) $(NCURSES) $(KYOTOCAB)
+ARCHIVES := $(LIBSSL).tar.gz $(ZLIB).tar.gz $(CURL).tar.xz $(SSH2).tar.xz $(CCACHE).tar.xz $(NCURSES).tar.gz $(KYOTOCAB).tar.gz
+OUTPUTS := $(T)/lib/libssl.a $(T)/lib/libcrypto.a $(T)/lib/libz.a \
+	$(T)/lib/libcurl.a $(T)/lib/libssh2.a $(T)/lib/libncursesw.a \
+	$(T)/lib/libkyotocabinet.a $(T)/bin/ccache
+AUTOCONF_ENV = CC="$(CC)" CXX="$(CXX)" AR="$(AR)" RANLIB="$(RANLIB)" \
+	CFLAGS="$(CFLAGS)" CXXFLAGS="$(CXXFLAGS)" LDFLAGS="$(LDFLAGS)"
+CMAKE_FLAGS = -G Ninja -DARCH=$(ARCH) -DROOT="$(R)" -DTARGET_PREFIX="$(T)" \
+	-DCMAKE_TOOLCHAIN_FILE="$(R)/settings.cmake" -DTOOLCHAIN_PREFIX="$(TOOLCHAIN)" \
+	-DCMAKE_INSTALL_PREFIX="$(T)" -DCMAKE_C_FLAGS="$(CFLAGS) -static" \
+	-DCMAKE_CXX_FLAGS="$(CXXFLAGS) -static" -DFORCE_STATIC=ON \
+	-DCCACHE=$(if $(CCACHE_LAUNCHER),ON,OFF)
 
-GCC_BINS := $(R)/dyne/gcc-musl/bin/$(ARCH)
-CC  := ccache $(GCC_BINS)-gcc --static
-CXX := ccache $(GCC_BINS)-g++ --static
-ASM := $(GCC_BINS)-as
-AR := $(GCC_BINS)-ar
+.PHONY: all fetch build clean FORCE
+# Verify every cached input before any extraction or compilation starts.
+all: build
+fetch: $(addprefix $(SOURCE_CACHE)/,$(ARCHIVES))
+	@set -e; for archive in $(ARCHIVES); do \
+		sh "$(R)/scripts/download.sh" "$(SOURCES_URL)/$$archive" "$(SOURCE_CACHE)/$$archive" "$(CHECKSUMS)"; \
+	done
+build: $(OUTPUTS)
 
-all: \
-	$(T)/lib/libssl.a  \
-	$(T)/lib/libz.a    \
-	$(T)/lib/libcurl.a \
-	$(T)/lib/libssh2.a \
-	$(T)/lib/libncursesw.a \
-	$(T)/lib/libkyotocabinet.a \
-	$(T)/bin/ccache
+$(B)/config: FORCE
+	@mkdir -p "$(B)"
+	@set -e; { $(foreach key,ARCH T TOOLCHAIN CC CXX AR RANLIB CFLAGS CXXFLAGS LDFLAGS PACKAGES CCACHE_LAUNCHER,printf '%s\n' '$(key)=$($(key))';) \
+		sha256sum GNUmakefile "$(R)/settings.cmake" "$(CHECKSUMS)" "$(TOOLCHAIN)/bin/$(ARCH)-gcc"; \
+		if test "$(TOOLCHAIN)" = "$(R)/dyne/gcc-musl" && test -f "$(R)/build/toolchain/$(ARCH)/config"; then \
+			sha256sum "$(R)/build/toolchain/$(ARCH)/config"; \
+		fi; \
+	} > "$@.tmp"
+	@if cmp -s "$@.tmp" "$@"; then rm -f "$@.tmp"; else \
+		rm -rf "$(T)"; mv -f "$@.tmp" "$@"; \
+	fi
 
-$(T)/lib/libssl.a: $(LIBSSL).orig
-	$(info Building SSL library)
-	cd $(LIBSSL).orig \
-	&& CC="$(CC)" AR="$(AR)" \
-	CFLAGS="-static -g0 -Os -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow" \
-	./configure --prefix=$(T) --build=x86_64-linux-musl --host=$(ARCH) \
-		--disable-shared --disable-tests --disable-dependency-tracking \
-	&& $(MAKE) -j`nproc` && $(MAKE) install
+# Re-extract on configuration/version changes; never reuse another target's CMake cache.
+define extract
+$(B)/$(1)/.extracted: $(SOURCE_CACHE)/$(2) $(B)/config | fetch
+	rm -rf "$(B)/$(1)"
+	mkdir -p "$(B)/$(1)"
+	tar -xf "$$<" -C "$(B)/$(1)" --strip-components=1
+	touch "$$@"
+endef
+$(foreach archive,$(ARCHIVES),$(eval $(call extract,$(firstword $(subst .tar., ,$(archive))),$(archive))))
 
-$(T)/lib/libz.a: $(ZLIB).orig
-	$(info Building Z library)
-	mkdir -p $(ZLIB).orig/build && cd $(ZLIB).orig && \
-	cmake -G Ninja -S . -B build -DARCH=${ARCH} -DROOT="$(R)" \
-	-DCMAKE_TOOLCHAIN_FILE="${R}/settings.cmake" -DCMAKE_INSTALL_PREFIX="${R}/dyne/${ARCH}" \
-		-DZLIB_ENABLE_TESTS=0 -DZLIB_COMPAT=1 -DZLIBNG_ENABLE_TESTS=0 \
-		-DWITH_SANITIZER=0 -DWITH_GTEST=0 -DBUILD_SHARED_LIBS=0 \
-	&& ninja -C build && ninja -C build install
+# These explicit file targets allow direct builds after fetching sources.
+$(addprefix $(SOURCE_CACHE)/,$(ARCHIVES)):
+	sh "$(R)/scripts/download.sh" "$(SOURCES_URL)/$(notdir $@)" "$@" "$(CHECKSUMS)"
 
-$(T)/lib/libcurl.a: $(CURL).orig
-	$(info Building CURL library)
-	mkdir -p $(CURL).orig/build && cd $(CURL).orig && \
-	cmake -G Ninja -S . -B build -DARCH=${ARCH} -DROOT="$(R)" \
-	-DCMAKE_TOOLCHAIN_FILE="${R}/settings.cmake" -DCMAKE_INSTALL_PREFIX="${R}/dyne/${ARCH}" \
-		-DBUILD_SHARED_LIBS=0 -DBUILD_STATIC_LIBS=1 -DBUILD_STATIC_CURL=1 \
-		-DCURL_LTO=0 -DENABLE_THREADED_RESOLVER=1 -DCURL_USE_LIBPSL=0 \
-	  -DBUILD_LIBCURL_DOCS=0 -DBUILD_MISC_DOCS=0 -DENABLE_CURL_MANUAL=0 \
-		-DCURL_USE_OPENSSL=1 \
-	&& ninja -C build && ninja -C build install
+# GNU make grouped targets rebuild LibreSSL when either archive is missing.
+$(T)/lib/libssl.a $(T)/lib/libcrypto.a &: $(B)/$(LIBSSL)/.extracted
+	cd "$(B)/$(LIBSSL)" && $(AUTOCONF_ENV) ./configure --prefix="$(T)" \
+		--build=x86_64-linux-musl --host=$(ARCH) --disable-shared --disable-tests --disable-dependency-tracking
+	$(MAKE) -C "$(B)/$(LIBSSL)" -j$(JOBS)
+	$(MAKE) -C "$(B)/$(LIBSSL)" install
 
-$(T)/lib/libssh2.a: $(SSH2).orig
-	$(info Building SSH2 library)
-	mkdir -p $(SSH2).orig/build && cd $(SSH2).orig && \
-	cmake -G Ninja -S . -B build -DARCH=${ARCH} -DROOT="$(R)" \
-	-DCMAKE_TOOLCHAIN_FILE="${R}/settings.cmake" -DCMAKE_INSTALL_PREFIX="${R}/dyne/${ARCH}" \
-		-DBUILD_SHARED_LIBS=0 -DBUILD_TESTING=0 -DBUILD_EXAMPLES=0 \
-		-DCRYPTO_BACKEND="OpenSSL" \
-	&& ninja -C build && ninja -C build install
+$(T)/lib/libz.a: $(B)/$(ZLIB)/.extracted
+	cmake -S "$(B)/$(ZLIB)" -B "$(B)/$(ZLIB)/build" $(CMAKE_FLAGS) \
+		-DZLIB_COMPAT=ON -DZLIB_ENABLE_TESTS=OFF -DZLIBNG_ENABLE_TESTS=OFF \
+		-DWITH_SANITIZER=OFF -DWITH_GTEST=OFF -DBUILD_SHARED_LIBS=OFF
+	cmake --build "$(B)/$(ZLIB)/build" --parallel $(JOBS)
+	cmake --install "$(B)/$(ZLIB)/build"
 
-# && CC="$(CC)" AR=$(AR) CFLAGS="-static -g0 -Os" PKG_CONFIG_PATH=$(PREFIX)/lib/pkgconfig \
-# ./configure --prefix=$(PREFIX)/$(ARCH) --disable-shared --disable-tests --with-crypto=openssl --with-sysroot=$(PREFIX)  \
-# --build=x86_64-linux-musl --host=$(ARCH) \
-# && $(MAKE) -j`nproc` && $(MAKE) install
+$(T)/lib/libssh2.a: $(B)/$(SSH2)/.extracted $(T)/lib/libssl.a $(T)/lib/libcrypto.a $(T)/lib/libz.a
+	cmake -S "$(B)/$(SSH2)" -B "$(B)/$(SSH2)/build" $(CMAKE_FLAGS) \
+		-DBUILD_SHARED_LIBS=OFF -DBUILD_TESTING=OFF -DBUILD_EXAMPLES=OFF -DCRYPTO_BACKEND=OpenSSL
+	cmake --build "$(B)/$(SSH2)/build" --parallel $(JOBS)
+	cmake --install "$(B)/$(SSH2)/build"
 
-$(T)/lib/libncursesw.a: $(NCURSES).orig
-	$(info Building ncurses library)
-	cd $(NCURSES).orig \
-	&& CC="$(CC)" CXX="$(CXX)" AR="$(AR)" \
-	CFLAGS="-static -g0 -Os -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow" \
-	./configure --prefix=$(T) --build=x86_64-linux-musl --host=$(ARCH) \
-	--enable-static --disable-shared --without-cxx-binding \
-	&& make && make install
+$(T)/lib/libcurl.a: $(B)/$(CURL)/.extracted $(T)/lib/libssl.a $(T)/lib/libcrypto.a $(T)/lib/libz.a $(T)/lib/libssh2.a
+	cmake -S "$(B)/$(CURL)" -B "$(B)/$(CURL)/build" $(CMAKE_FLAGS) \
+		-DBUILD_SHARED_LIBS=OFF -DBUILD_STATIC_LIBS=ON -DBUILD_STATIC_CURL=ON \
+		-DCURL_LTO=OFF -DENABLE_THREADED_RESOLVER=ON -DCURL_USE_LIBPSL=OFF \
+		-DBUILD_LIBCURL_DOCS=OFF -DBUILD_MISC_DOCS=OFF -DENABLE_CURL_MANUAL=OFF \
+		-DCURL_USE_OPENSSL=ON -DCURL_USE_LIBSSH2=ON -DCURL_BROTLI=OFF -DCURL_ZSTD=OFF \
+		-DOPENSSL_USE_STATIC_LIBS=TRUE
+	cmake --build "$(B)/$(CURL)/build" --parallel $(JOBS)
+	cmake --install "$(B)/$(CURL)/build"
 
-# -DCMAKE_INSTALL_PREFIX="${PREFIX}/${ARCH}"
-$(T)/bin/ccache: $(CCACHE).orig
-	$(info Building CCACHE)
-	mkdir -p $(CCACHE).orig/build && cd $(CCACHE).orig && \
-	cmake -G Ninja -S . -B build -DARCH=${ARCH} -DROOT="$(R)" \
-	-DCMAKE_TOOLCHAIN_FILE="${R}/settings.cmake" -DCMAKE_INSTALL_PREFIX="${R}/dyne/${ARCH}" \
-		-DFORCE_STATIC=1 \
-		-DHTTP_STORAGE_BACKEND=OFF -DENABLE_TESTING=OFF \
-		-DREDIS_STORAGE_BACKEND=OFF -DSTATIC_LINK=ON \
-	&& ninja -C build && ninja -C build install
+$(T)/lib/libncursesw.a: $(B)/$(NCURSES)/.extracted
+	cd "$(B)/$(NCURSES)" && $(AUTOCONF_ENV) ./configure --prefix="$(T)" \
+		--build=x86_64-linux-musl --host=$(ARCH) --enable-widec \
+		--with-normal --without-shared --without-cxx-binding --without-ada \
+		--without-debug --without-tests --without-progs --disable-db-install \
+		--with-default-terminfo-dir=/usr/share/terminfo \
+		--with-terminfo-dirs=/etc/terminfo:/lib/terminfo:/usr/share/terminfo
+	$(MAKE) -C "$(B)/$(NCURSES)" -j$(JOBS)
+	$(MAKE) -C "$(B)/$(NCURSES)" install
 
-$(T)/lib/libkyotocabinet.a: $(KYOTOCAB).orig
-	$(info Building Kyoto Cabinet DBM)
-	cd $(KYOTOCAB).orig && \
-	CC="$(CC)" CXX="$(CXX)" AR="$(AR)" \
-	CFLAGS="-static -g0 -Os -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow" \
-	./configure --prefix=$(T) --build=x86_64-linux-musl --host=$(ARCH) \
-	--enable-static --disable-shared --disable-zlib \
-	&& make && make install
+$(T)/lib/libkyotocabinet.a: $(B)/$(KYOTOCAB)/.extracted
+	cd "$(B)/$(KYOTOCAB)" && $(AUTOCONF_ENV) ./configure --prefix="$(T)" \
+		--build=x86_64-linux-musl --host=$(ARCH) --enable-static --disable-shared --disable-zlib
+	# Upstream adds -march=native and -O2: preserve the selected target flags.
+	$(MAKE) -C "$(B)/$(KYOTOCAB)" -j$(JOBS) \
+		CFLAGS="$(CFLAGS) -fPIC -fsigned-char" CXXFLAGS="$(CXXFLAGS) -fPIC -fsigned-char"
+	$(MAKE) -C "$(B)/$(KYOTOCAB)" install \
+		CFLAGS="$(CFLAGS) -fPIC -fsigned-char" CXXFLAGS="$(CXXFLAGS) -fPIC -fsigned-char"
 
-# upstream: https://ftp.openbsd.org/pub/OpenBSD/LibreSSL/
-$(LIBSSL).tar.gz:
-	curl -L ${SOURCES_URL}/$@ --output $@
-
-# upstream: https://github.com/zlib-ng/zlib-ng/releases
-$(ZLIB).tar.gz:
-	curl -L ${SOURCES_URL}/$@ --output $@
-
-# upstream: https://curl.se/download/curl-8.15.0.tar.xz
-$(CURL).tar.xz:
-	curl -L ${SOURCES_URL}/$@ --output $@
-
-# upstream: https://libssh2.org
-$(SSH2).tar.xz:
-	curl -L ${SOURCES_URL}/$@ --output $@
-
-$(CCACHE).tar.xz:
-	curl -L ${SOURCES_URL}/$@ --output $@
-
-# upstream: https://invisible-island.net/archives/ncurses/
-$(NCURSES).tar.gz:
-	curl -L ${SOURCES_URL}/$@ --output $@
-
-# upstream: https://dbmx.net/kyotocabinet/pkg/
-$(KYOTOCAB).tar.gz:
-	curl -L ${SOURCES_URL}/$@ --output $@
+$(T)/bin/ccache: $(B)/$(CCACHE)/.extracted
+	cmake -S "$(B)/$(CCACHE)" -B "$(B)/$(CCACHE)/build" $(CMAKE_FLAGS) \
+		-DHTTP_STORAGE_BACKEND=OFF -DENABLE_TESTING=OFF -DREDIS_STORAGE_BACKEND=OFF -DSTATIC_LINK=ON
+	cmake --build "$(B)/$(CCACHE)/build" --parallel $(JOBS)
+	cmake --install "$(B)/$(CCACHE)/build"
 
 clean:
-	rm -rf *.orig
-	rm -f \
-		$(T)/lib/libssl.*    \
-		$(T)/lib/libcrypto.* \
-		$(T)/lib/libz.*    \
-		$(T)/lib/libcurl.* \
-		$(T)/lib/libssh2.* \
-		$(T)/bin/ccache
-
-%.orig: %.tar.gz
-	tar zxf - < $<
-	mv $(patsubst %.orig,%,$@) $@
-
-%.orig: %.tar.xz
-	tar Jxf - < $<
-	mv $(patsubst %.orig,%,$@) $@
+	rm -rf "$(B)" "$(T)"

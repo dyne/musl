@@ -1,61 +1,56 @@
-### CMake settings for the dyne/musl toolchain
+# Toolchain for x86_64-hosted GCC/musl cross-compilers.
+set(ARCH "x86_64-linux-musl" CACHE STRING "Target tuple")
+set(ROOT "/opt" CACHE PATH "Directory containing dyne/")
+set(TOOLCHAIN_PREFIX "${ROOT}/dyne/gcc-musl" CACHE PATH "Installed cross-compiler prefix")
+set(TARGET_PREFIX "${ROOT}/dyne/${ARCH}" CACHE PATH "Additional target libraries and headers")
+option(CCACHE "Use host ccache" ON)
+option(FOR_MUSL_DYNE "Install into the target library prefix" OFF)
+option(FORCE_STATIC "Force static executable and C++ runtime linking" OFF)
 
-# Configurable settings
-set(ARCH "x86_64-linux-musl" CACHE STRING "Target architecture to (cross)compile")
-set(CMAKE_CXX_FLAGS "-static --static -g0 -Os -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow" CACHE STRING "C++ Compilation flags, default set for small and secure binaries")
-set(CMAKE_C_FLAGS "-static --static -g0 -Os -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow" CACHE STRING "C Compilation flags, default set for small and secure binaries")
-set(ROOT "/opt" CACHE STRING "Base root prefix for installation (often referred as PREFIX or DESTDIR)")
-option(CCACHE "Use ccache to speed up compilation" 1)
-option(FOR_MUSL_DYNE "Install target will copy everything inside /opt/musl-dyne" 0)
-option(FORCE_STATIC "Force linker flags to build static executables (may fix or break some cases)" 0)
+set(CMAKE_SYSTEM_NAME Linux)
+string(REGEX REPLACE "-.*" "" CMAKE_SYSTEM_PROCESSOR "${ARCH}")
+set(CMAKE_C_COMPILER "${TOOLCHAIN_PREFIX}/bin/${ARCH}-gcc")
+set(CMAKE_CXX_COMPILER "${TOOLCHAIN_PREFIX}/bin/${ARCH}-g++")
+set(CMAKE_ASM_COMPILER "${TOOLCHAIN_PREFIX}/bin/${ARCH}-as")
+set(CMAKE_AR "${TOOLCHAIN_PREFIX}/bin/${ARCH}-ar")
+set(CMAKE_RANLIB "${TOOLCHAIN_PREFIX}/bin/${ARCH}-ranlib")
+# libc belongs to GCC's sysroot; the separate prefix adds third-party packages.
+set(CMAKE_SYSROOT "${TOOLCHAIN_PREFIX}/${ARCH}")
+set(CMAKE_FIND_ROOT_PATH "${TARGET_PREFIX};${CMAKE_SYSROOT}")
+set(CMAKE_PREFIX_PATH "${TARGET_PREFIX}")
+set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
+set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
+set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
+set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
+include_directories(SYSTEM "${TARGET_PREFIX}/include")
 
-set(R "${CMAKE_CURRENT_SOURCE_DIR}")
+set(CMAKE_C_FLAGS "-static -g0 -Os -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow" CACHE STRING "C flags")
+set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS}" CACHE STRING "C++ flags")
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type")
+endif()
+set(CMAKE_C_FLAGS_RELEASE "-DNDEBUG" CACHE STRING "Additional Release C flags")
+set(CMAKE_CXX_FLAGS_RELEASE "-DNDEBUG" CACHE STRING "Additional Release C++ flags")
 
-# No need to change anything below here
-set(PREFIX "${ROOT}/dyne")
-set(CMAKE_C_COMPILER   "${PREFIX}/gcc-musl/bin/${ARCH}-gcc")
-set(CMAKE_CXX_COMPILER "${PREFIX}/gcc-musl/bin/${ARCH}-g++")
-set(CMAKE_ASM_COMPILER "${PREFIX}/gcc-musl/bin/${ARCH}-as")
-
-set(CMAKE_SYSROOT "${PREFIX}/${ARCH}")
-set(CMAKE_PREFIX_PATH "${PREFIX}/gcc-musl;${PREFIX}/${ARCH}")
-include_directories(SYSTEM "${PREFIX}/${ARCH}/include")
-
-# Remove flags added by build type
-set(CMAKE_BUILD_TYPE "Release")
-set(CMAKE_CXX_FLAGS_RELEASE "")
-
-function(echo msg)
-    if(NOT DEFINED PRINT_ONCE_${msg})
-        message(STATUS "${msg}")
-        set(PRINT_ONCE_${msg} TRUE CACHE INTERNAL "Flag for first pass message printed")
-    endif()
-endfunction()
-# Define escape sequence
-string(ASCII 27 Esc)
-set(Red     "${Esc}[31m")
-set(Green   "${Esc}[32m")
-set(Yellow  "${Esc}[33m")
-set(Reset   "${Esc}[0m")
-
-
-
-echo("💪 ${Green}Dyne / Musl toolchain configured${Reset}")
-echo("💪 Build target architecture: ${ARCH}")
-
+# Compatibility for callers that used the formerly checked, undocumented name.
+if(DEFINED MUSL_DYNE)
+  message(DEPRECATION "Use FOR_MUSL_DYNE instead of MUSL_DYNE")
+  if(MUSL_DYNE)
+    set(FOR_MUSL_DYNE ON)
+  endif()
+endif()
+if(FOR_MUSL_DYNE)
+  set(CMAKE_INSTALL_PREFIX "${TARGET_PREFIX}" CACHE PATH "Install prefix" FORCE)
+endif()
 if(CCACHE)
-  set(CMAKE_C_COMPILER_LAUNCHER "ccache")
-  set(CMAKE_CXX_COMPILER_LAUNCHER "ccache")
-  echo("💪 Using CCACHE to speed up build")
+  find_program(DYNE_HOST_CCACHE ccache REQUIRED NO_CMAKE_FIND_ROOT_PATH)
+  set(CMAKE_C_COMPILER_LAUNCHER "${DYNE_HOST_CCACHE}")
+  set(CMAKE_CXX_COMPILER_LAUNCHER "${DYNE_HOST_CCACHE}")
 endif()
-
-if(MUSL_DYNE)
-  set(CMAKE_INSTALL_PREFIX "${R}/dyne/${ARCH}")
-  include_directories(SYSTEM "${R}/dyne/${ARCH}/include")
-  echo("💪 Building to install inside dyne/${ARCH}")
-endif()
-
 if(FORCE_STATIC)
-  set(CMAKE_EXE_LINKER_FLAGS "-static -static-libgcc -static-libstdc++")
-  echo("💪 Forcing static compiler flags")
+  string(APPEND CMAKE_EXE_LINKER_FLAGS_INIT " -static -static-libgcc -static-libstdc++")
 endif()
+
+# Toolchain files are reread in CMake's try_compile projects.
+list(APPEND CMAKE_TRY_COMPILE_PLATFORM_VARIABLES
+  ARCH ROOT TOOLCHAIN_PREFIX TARGET_PREFIX CCACHE FOR_MUSL_DYNE FORCE_STATIC)

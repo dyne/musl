@@ -1,0 +1,14 @@
+/config.mak
+/output*/
+/build/
+/build-*/
+/binutils-*/
+/gcc-*/
+/musl-*/
+/gmp-*/
+/mpc-*/
+/mpfr-*/
+/linux-*/
+/isl-*/
+/sources/*
+!/sources/GNUmakefile

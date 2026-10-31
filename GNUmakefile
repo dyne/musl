@@ -1,38 +1,44 @@
 ARCH ?= x86_64-linux-musl
+BUILD_FLAVOR ?= static-small
+# Compatibility with the old wrapper option. MUSL_CONFIG has a different
+# meaning (configure arguments) inside musl-cross-make; do not leak the name.
+ifneq ($(filter static-small shared-optim,$(MUSL_CONFIG)),)
+BUILD_FLAVOR := $(MUSL_CONFIG)
+override MUSL_CONFIG :=
+endif
+ALPINE_BRANCH ?= v3.24
+JOBS ?= $(shell nproc)
+export ARCH
 
-# for a list of targets: ls gcc-musl/*.mak
-# shared-optim
-MUSL_CONFIG ?= static-small
-
-all: gcc libs
-	$(info Build completed!)
-	$(MAKE) prepare
+.PHONY: all chroot gcc libs prepare smoke test clean
+all: prepare
 
 chroot: /alpine/enter-chroot
-
-gcc: dyne/gcc-musl/bin/$(ARCH)-gcc
-
-libs: dyne/$(ARCH)/lib/libssl.a
-prepare:
-	sh prepare.sh $(ARCH)
-
-/alpine/enter-chroot: APKS := bash make cmake gcc build-base musl-dev curl patch gawk ccache perl rsync xz samurai coreutils-fmt
 /alpine/enter-chroot:
-	$(info 💪 Alpine chroot packages: $(APKS))
-	./alpine-chroot-install -a x86_64 -d /alpine -p "$(APKS)"
+	./alpine-chroot-install -a x86_64 -b $(ALPINE_BRANCH) -d /alpine \
+		-p 'bash make cmake gcc build-base musl-dev curl patch gawk ccache perl rsync xz samurai coreutils-fmt file binutils python3'
 
-dyne/gcc-musl/bin/$(ARCH)-gcc:
-	$(info 💪 GCC-musl build config: $(MUSL_CONFIG))
-	cd gcc-musl && ln -sf config.$(MUSL_CONFIG).mak config.mak
-	$(MAKE) -C gcc-musl/sources
-	$(MAKE) -C gcc-musl -j`nproc`
-	$(MAKE) -C gcc-musl install PREFIX=$(CURDIR)/dyne/gcc-musl
+# Always enter sub-builds; their own state decides what needs rebuilding.
+gcc:
+	test -f "gcc-musl/config.$(BUILD_FLAVOR).mak"
+	cd gcc-musl && ln -sf "config.$(BUILD_FLAVOR).mak" config.mak
+	sh scripts/toolchain-state.sh $(ARCH)
+	$(MAKE) -C gcc-musl -j$(JOBS) ARCH=$(ARCH)
+	$(MAKE) -C gcc-musl install ARCH=$(ARCH) PREFIX=$(CURDIR)/dyne/gcc-musl
 
-dyne/$(ARCH)/lib/libssl.a:
-	$(info 💪 Base libs arch: $(ARCH))
-	$(MAKE) -C libs         ARCH=$(ARCH) PREFIX=$(CURDIR)/dyne/$(ARCH)
+libs: gcc
+	$(MAKE) -C libs ARCH=$(ARCH) PREFIX=$(CURDIR)/dyne/$(ARCH) JOBS=$(JOBS)
+
+prepare: libs
+	bash prepare.sh $(ARCH)
+
+smoke:
+	bash scripts/smoke.sh $(ARCH)
+
+test:
+	python3 -m unittest discover -s tests -v
 
 clean:
-	rm -rf dyne
+	$(MAKE) -C libs clean ARCH=$(ARCH)
 	$(MAKE) -C gcc-musl clean
-	$(MAKE) -C libs clean
+	rm -rf dyne build
