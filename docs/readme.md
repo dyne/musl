@@ -65,8 +65,9 @@ option(FORCE_STATIC "Force linker flags to build static executables (may fix or 
 ## Source components
 
 Exact release URLs are recorded in [sources.urls](https://github.com/dyne/musl/blob/master/sources.urls).
-Builds download from upstream by default; a populated [Dyne source mirror](https://files.dyne.org/musl/sources)
-can be selected with `SOURCES_URL=https://files.dyne.org/musl/sources`.
+All build inputs download directly from their upstream projects: official
+release archives for packages and a pinned GNU repository revision for config.sub.
+Builds do not use Dyne's source cache or fall back to a source mirror.
 
 The source configuration includes `binutils-2.47.tar.xz`, `gcc-16.2.0.tar.xz`, `gmp-6.3.0.tar.xz`, `linux-7.3.1.tar.xz` (userspace headers), `mpc-1.4.1.tar.xz`, `mpfr-4.2.2.tar.xz`, and `musl-1.2.6.tar.gz`.
 
@@ -169,7 +170,7 @@ When updating to make a new release:
    or library versions in `libs/GNUmakefile`. Add the required source hash entries
    and verified URL/SHA-256 entries to `sources.urls` and `sources.sha256`.
 3. Check version-specific patches for upstream integration and refresh remaining
-   hunks. Mirror the exact verified archives when maintaining the source mirror.
+   hunks. Ensure each selected input has its exact upstream URL recorded.
 4. Run `make test` and clean builds/smoke checks for all four targets; update docs.
 5. Use a conventional commit (`fix:`, `feat:`, or a documented breaking change).
    CI validates every target on pull requests and master pushes. On a releasing
