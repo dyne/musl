@@ -12,7 +12,7 @@ trap 'exit 143' TERM
 {
     make --no-print-directory -s -C gcc-musl print-config ARCH="$arch"
     sha256sum GNUmakefile gcc-musl/Makefile gcc-musl/litecross/Makefile \
-        gcc-musl/config.mak scripts/toolchain-state.sh sources.sha256
+        gcc-musl/config.mak scripts/toolchain-state.sh scripts/compiler-cache.sh sources.sha256
     find gcc-musl/patches -type f -exec sha256sum {} + | LC_ALL=C sort
     cc -dumpmachine
     cc -dumpversion

@@ -39,7 +39,8 @@ ARCHIVES := $(LIBSSL).tar.gz $(ZLIB).tar.gz $(CURL).tar.xz $(SSH2).tar.xz $(CCAC
 OUTPUTS := $(T)/lib/libssl.a $(T)/lib/libcrypto.a $(T)/lib/libz.a \
 	$(T)/lib/libcurl.a $(T)/lib/libssh2.a $(T)/lib/libncursesw.a \
 	$(T)/lib/libkyotocabinet.a $(T)/bin/ccache
-AUTOCONF_ENV = CC="$(CC)" CXX="$(CXX)" AR="$(AR)" RANLIB="$(RANLIB)" \
+CACHE_ENV = sh "$(R)/scripts/compiler-cache.sh" "$(CCACHE_LAUNCHER)" "$(TOOLCHAIN)/bin/$(ARCH)-gcc"
+AUTOCONF_ENV = $(CACHE_ENV) env CC="$(CC)" CXX="$(CXX)" AR="$(AR)" RANLIB="$(RANLIB)" \
 	CFLAGS="$(CFLAGS)" CXXFLAGS="$(CXXFLAGS)" LDFLAGS="$(LDFLAGS)"
 CMAKE_FLAGS = -G Ninja -DARCH=$(ARCH) -DROOT="$(R)" -DTARGET_PREFIX="$(T)" \
 	-DCMAKE_TOOLCHAIN_FILE="$(R)/settings.cmake" -DTOOLCHAIN_PREFIX="$(TOOLCHAIN)" \
@@ -86,31 +87,31 @@ $(addprefix $(SOURCE_CACHE)/,$(ARCHIVES)):
 $(T)/lib/libssl.a $(T)/lib/libcrypto.a &: $(B)/$(LIBSSL)/.extracted
 	cd "$(B)/$(LIBSSL)" && $(AUTOCONF_ENV) ./configure --prefix="$(T)" \
 		--build=x86_64-linux-musl --host=$(ARCH) --disable-shared --disable-tests --disable-dependency-tracking
-	$(MAKE) -C "$(B)/$(LIBSSL)" -j$(JOBS)
-	$(MAKE) -C "$(B)/$(LIBSSL)" install
+	$(CACHE_ENV) $(MAKE) -C "$(B)/$(LIBSSL)" -j$(JOBS)
+	$(CACHE_ENV) $(MAKE) -C "$(B)/$(LIBSSL)" install
 
 $(T)/lib/libz.a: $(B)/$(ZLIB)/.extracted
-	cmake -S "$(B)/$(ZLIB)" -B "$(B)/$(ZLIB)/build" $(CMAKE_FLAGS) \
+	$(CACHE_ENV) cmake -S "$(B)/$(ZLIB)" -B "$(B)/$(ZLIB)/build" $(CMAKE_FLAGS) \
 		-DZLIB_COMPAT=ON -DZLIB_ENABLE_TESTS=OFF -DZLIBNG_ENABLE_TESTS=OFF \
 		-DWITH_SANITIZER=OFF -DWITH_GTEST=OFF -DBUILD_SHARED_LIBS=OFF
-	cmake --build "$(B)/$(ZLIB)/build" --parallel $(JOBS)
-	cmake --install "$(B)/$(ZLIB)/build"
+	$(CACHE_ENV) cmake --build "$(B)/$(ZLIB)/build" --parallel $(JOBS)
+	$(CACHE_ENV) cmake --install "$(B)/$(ZLIB)/build"
 
 $(T)/lib/libssh2.a: $(B)/$(SSH2)/.extracted $(T)/lib/libssl.a $(T)/lib/libcrypto.a $(T)/lib/libz.a
-	cmake -S "$(B)/$(SSH2)" -B "$(B)/$(SSH2)/build" $(CMAKE_FLAGS) \
+	$(CACHE_ENV) cmake -S "$(B)/$(SSH2)" -B "$(B)/$(SSH2)/build" $(CMAKE_FLAGS) \
 		-DBUILD_SHARED_LIBS=OFF -DBUILD_TESTING=OFF -DBUILD_EXAMPLES=OFF -DCRYPTO_BACKEND=OpenSSL
-	cmake --build "$(B)/$(SSH2)/build" --parallel $(JOBS)
-	cmake --install "$(B)/$(SSH2)/build"
+	$(CACHE_ENV) cmake --build "$(B)/$(SSH2)/build" --parallel $(JOBS)
+	$(CACHE_ENV) cmake --install "$(B)/$(SSH2)/build"
 
 $(T)/lib/libcurl.a: $(B)/$(CURL)/.extracted $(T)/lib/libssl.a $(T)/lib/libcrypto.a $(T)/lib/libz.a $(T)/lib/libssh2.a
-	cmake -S "$(B)/$(CURL)" -B "$(B)/$(CURL)/build" $(CMAKE_FLAGS) \
+	$(CACHE_ENV) cmake -S "$(B)/$(CURL)" -B "$(B)/$(CURL)/build" $(CMAKE_FLAGS) \
 		-DBUILD_SHARED_LIBS=OFF -DBUILD_STATIC_LIBS=ON -DBUILD_STATIC_CURL=ON \
 		-DCURL_LTO=OFF -DENABLE_THREADED_RESOLVER=ON -DCURL_USE_LIBPSL=OFF \
 		-DBUILD_LIBCURL_DOCS=OFF -DBUILD_MISC_DOCS=OFF -DENABLE_CURL_MANUAL=OFF \
 		-DCURL_USE_OPENSSL=ON -DCURL_USE_LIBSSH2=ON -DCURL_BROTLI=OFF -DCURL_ZSTD=OFF \
 		-DOPENSSL_USE_STATIC_LIBS=TRUE
-	cmake --build "$(B)/$(CURL)/build" --parallel $(JOBS)
-	cmake --install "$(B)/$(CURL)/build"
+	$(CACHE_ENV) cmake --build "$(B)/$(CURL)/build" --parallel $(JOBS)
+	$(CACHE_ENV) cmake --install "$(B)/$(CURL)/build"
 
 $(T)/lib/libncursesw.a: $(B)/$(NCURSES)/.extracted
 	cd "$(B)/$(NCURSES)" && $(AUTOCONF_ENV) ./configure --prefix="$(T)" \
@@ -119,23 +120,23 @@ $(T)/lib/libncursesw.a: $(B)/$(NCURSES)/.extracted
 		--without-debug --without-tests --without-progs --disable-db-install \
 		--with-default-terminfo-dir=/usr/share/terminfo \
 		--with-terminfo-dirs=/etc/terminfo:/lib/terminfo:/usr/share/terminfo
-	$(MAKE) -C "$(B)/$(NCURSES)" -j$(JOBS)
-	$(MAKE) -C "$(B)/$(NCURSES)" install
+	$(CACHE_ENV) $(MAKE) -C "$(B)/$(NCURSES)" -j$(JOBS)
+	$(CACHE_ENV) $(MAKE) -C "$(B)/$(NCURSES)" install
 
 $(T)/lib/libkyotocabinet.a: $(B)/$(KYOTOCAB)/.extracted
 	cd "$(B)/$(KYOTOCAB)" && $(AUTOCONF_ENV) ./configure --prefix="$(T)" \
 		--build=x86_64-linux-musl --host=$(ARCH) --enable-static --disable-shared --disable-zlib
 	# Upstream adds -march=native and -O2: preserve the selected target flags.
-	$(MAKE) -C "$(B)/$(KYOTOCAB)" -j$(JOBS) \
+	$(CACHE_ENV) $(MAKE) -C "$(B)/$(KYOTOCAB)" -j$(JOBS) \
 		CFLAGS="$(CFLAGS) -fPIC -fsigned-char" CXXFLAGS="$(CXXFLAGS) -fPIC -fsigned-char"
-	$(MAKE) -C "$(B)/$(KYOTOCAB)" install \
+	$(CACHE_ENV) $(MAKE) -C "$(B)/$(KYOTOCAB)" install \
 		CFLAGS="$(CFLAGS) -fPIC -fsigned-char" CXXFLAGS="$(CXXFLAGS) -fPIC -fsigned-char"
 
 $(T)/bin/ccache: $(B)/$(CCACHE)/.extracted
-	cmake -S "$(B)/$(CCACHE)" -B "$(B)/$(CCACHE)/build" $(CMAKE_FLAGS) \
+	$(CACHE_ENV) cmake -S "$(B)/$(CCACHE)" -B "$(B)/$(CCACHE)/build" $(CMAKE_FLAGS) \
 		-DHTTP_STORAGE_BACKEND=OFF -DENABLE_TESTING=OFF -DREDIS_STORAGE_BACKEND=OFF -DSTATIC_LINK=ON
-	cmake --build "$(B)/$(CCACHE)/build" --parallel $(JOBS)
-	cmake --install "$(B)/$(CCACHE)/build"
+	$(CACHE_ENV) cmake --build "$(B)/$(CCACHE)/build" --parallel $(JOBS)
+	$(CACHE_ENV) cmake --install "$(B)/$(CCACHE)/build"
 
 clean:
 	rm -rf "$(B)" "$(T)"

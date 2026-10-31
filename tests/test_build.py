@@ -277,7 +277,7 @@ class ToolchainState(Workspace):
         self.assertEqual(len(urls), len((ROOT / "sources.urls").read_text().splitlines()))
         self.assertEqual(set(urls), set(digests))
         self.assertTrue(all(re.fullmatch(r"[0-9a-f]{64}", digest) for digest in digests.values()))
-        self.assertTrue(all(url.startswith("https://") for url in urls.values()))
+        self.assertTrue(all(url.startswith(("https://", "git+https://")) for url in urls.values()))
         self.assertTrue(all("files.dyne.org" not in url for url in urls.values()))
         probe = self.work / "sources.mk"
         probe.write_text('show-sources:\n\t@printf "%s\\n" $(ARCHIVES) config.sub.$(CONFIG_SUB_REV)\n')
@@ -339,7 +339,8 @@ class ToolchainState(Workspace):
         (self.work / "scripts").mkdir()
         shutil.copy(ROOT / "scripts/toolchain-state.sh", self.work / "scripts/toolchain-state.sh")
         for name in ["GNUmakefile", "sources.sha256", "gcc-musl/config.mak",
-                     "gcc-musl/litecross/Makefile", "gcc-musl/patches/gcc/fix.diff"]:
+                     "gcc-musl/litecross/Makefile", "gcc-musl/patches/gcc/fix.diff",
+                     "scripts/compiler-cache.sh"]:
             p = self.work / name
             p.parent.mkdir(parents=True, exist_ok=True)
             p.write_text("fixture\n")

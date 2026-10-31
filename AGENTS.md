@@ -37,6 +37,7 @@ before making claims about what is currently published.
 | `gcc-musl/sources/GNUmakefile` | Delegates fetching to the selected compiler configuration |
 | `sources.urls`, `sources.sha256`, `scripts/download.sh` | Exact upstream URLs and integrity checks for new and cached inputs |
 | `scripts/toolchain-state.sh` | Invalidates selected compiler build/install state when inputs change |
+| `scripts/compiler-cache.sh`, `scripts/check-ccache.sh` | GCC/frontend cache identity and real bootstrap C/C++ hit probes |
 | `libs/GNUmakefile` | Library versions, dependency graph, per-target sources and installation |
 | `settings.cmake` | Consumer/internal cross-compilation settings |
 | `prepare.sh`, `scripts/smoke.sh`, `tests/` | Package preparation, real C/C++ checks, offline regression suite |
@@ -98,7 +99,7 @@ musl-cross-make, where MUSL_CONFIG means musl configure arguments.
 
 Alpine is pinned to branch `v3.24` on x86_64, with required tools explicitly
 installed. The bind mount exposes `./dyne` at the same working-directory path
-inside and outside the chroot. The generated entry script preserves ARCH and CI
+inside and outside the chroot. The generated entry script preserves ARCH, CI and CCACHE_*
 and handles sudo. Host mount privileges are required for `/alpine`; a restricted
 workspace alone cannot reproduce this environment.
 
@@ -121,7 +122,10 @@ Linux headers **7.3.1**, GMP **6.3.0**, MPC **1.4.1**, MPFR **4.2.2** and
 config.sub revision **3d5db9ebe860**. Check both configuration variants and base
 Makefile when updating; ISL is unselected. C/C++ are enabled. The default host
 tools use static linking, -Os and x86-64-v2; NLS, sanitizer, mudflap and LTO are
-disabled. Host ccache is used when available.
+disabled. Host ccache is used when available, including musl's in-tree xgcc and
+GCC target runtimes through STAGE_CC_WRAPPER. The frontend-content namespace
+helper also wraps library configure/build/install commands; do not replace
+generated target compiler flags or add unsafe ccache timestamp sloppiness.
 Both flavors build musl's static archive with `-fPIC` for static-PIE linkage;
 PIE applications must compile their own objects with `-fPIE` too.
 
@@ -156,6 +160,21 @@ New downloads fail on HTTP errors and publish only after verification. Corrupt
 existing inputs fail closed; remove the identified entry before retrying.
 An external SOURCES path must already contain all inputs and is treated as
 immutable. See maintenance for digest provenance and config.sub revision keys.
+config.sub uses `git+https://REPOSITORY.git#FULL_40_HEX_COMMIT:relative/path` in
+the URL manifest. Its exact Git blob is fetched with bounded retries/timeouts
+and checked against the unchanged SHA-256. Git and timeout are needed on a fresh
+download; cgit's HTTP frontend returned intermittent 404s even at the full pin.
+
+CI's compressed 2 GiB ccache snapshots are keyed by target, Alpine branch and
+build flavor, with a stable v2 prefix and no commit/PR identifier. PRs can restore
+master caches; GitHub isolates PR-written caches to that PR, so they cannot warm
+master or other PRs. Master release builds restore master caches. Snapshots are
+not merged across jobs. No external remote cache service is configured.
+`CCACHE_DIR` is the same workspace `.cache/ccache` path inside/outside Alpine;
+CCACHE_* is explicitly whitelisted and compiler_check is content. CI verifies
+the chroot settings, requires real C/C++ hits from scripts/check-ccache.sh, saves
+stats, then repairs runner ownership before cache upload. The first v2 build is
+cold. See maintenance for local commands and cache limitations.
 
 ## CMake and package checks
 
@@ -172,10 +191,13 @@ and host strip for compiler executables. It removes DSOs/libtool metadata for
 the selected target while leaving other target sysroots alone, retains license
 directories, and copies README.txt/settings.cmake.
 
-Run `make test` (Python 3 + PyYAML, Make >=4.3, curl, CMake, cc and file) and
+Run `make test` (Python 3 + PyYAML, Make >=4.3, curl, Git, CMake, cc/c++ and file) and
 `shellcheck prepare.sh scripts/*.sh` for changed automation. The offline suite
 checks cache failure paths, real Make rebuild/order behavior, cleanup, CMake,
-preparation, checksums and tag identity. For changed recipes, also run actual
+preparation, checksums and tag identity. Install host ccache for the actual
+cache-hit regression (required in CI); CCACHE_TEST_BINARY can select an existing
+host binary. Tests also check pinned Git blobs, retries/cleanup and chroot cache
+environment forwarding. For changed recipes, also run actual
 clean target builds. `make smoke` links C against all bundled C libraries and
 C++20/thread/atomic/Kyoto code, checks ELF architecture/static dependencies, and
 runs x86_64 binaries on compatible hosts. It also checks the ported static-PIE

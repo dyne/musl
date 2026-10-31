@@ -29,7 +29,7 @@ jobs:
       - name: Install validation tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y shellcheck python3-yaml
+          sudo apt-get install -y shellcheck python3-yaml ccache
       - name: Regression checks
         run: |
           make test
@@ -53,23 +53,52 @@ jobs:
             output: arm_64
     env:
       ARCH: ${{ matrix.target }}
-      CCACHE_DIR: /alpine/root/.cache/ccache
+      ALPINE_BRANCH: v3.24
+      BUILD_FLAVOR: static-small
+      # The workspace is mounted at the same path inside and outside Alpine.
+      CCACHE_DIR: ${{ github.workspace }}/.cache/ccache
+      CCACHE_COMPILERCHECK: content
+      CCACHE_MAXSIZE: 2G
+      CCACHE_COMPRESS: 'true'
       XZ_OPT: -9e -T0
     steps:
       - uses: actions/checkout@v6
-      - name: Prepare host ccache directory
+      - name: Prepare shared ccache directory
         run: |
-          sudo mkdir -p /alpine/root/.cache/ccache
-          sudo chmod -R a+rw /alpine/root/.cache
+          mkdir -p "$CCACHE_DIR"
       - uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: v2-${{ runner.os }}-${{ env.ALPINE_BRANCH }}-${{ env.BUILD_FLAVOR }}-${{ matrix.target }}
+          max-size: 2G
       - name: Build pinned Alpine chroot
-        run: sudo make chroot
+        run: sudo make chroot ALPINE_BRANCH="$ALPINE_BRANCH"
+      - name: Verify ccache configuration inside Alpine
+        run: |
+          # Expand the variables inside Alpine, after its environment is loaded.
+          # shellcheck disable=SC2016
+          /alpine/enter-chroot sh -eu -c '
+            test "$CCACHE_DIR" = "$PWD/.cache/ccache"
+            test "$(ccache --get-config compiler_check)" = content
+            ccache --show-config
+          '
+      - name: Fetch verified upstream sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p test-results
+          /alpine/enter-chroot make -C gcc-musl fetch-sources 2>&1 | tee test-results/fetch.log
+          /alpine/enter-chroot make -C libs fetch 2>&1 | tee -a test-results/fetch.log
       - name: Build compiler and libraries, prepare package
         shell: bash
         run: |
           set -o pipefail
           mkdir -p test-results
-          /alpine/enter-chroot make prepare 2>&1 | tee test-results/build.log
+          /alpine/enter-chroot make prepare BUILD_FLAVOR="$BUILD_FLAVOR" 2>&1 | tee test-results/build.log
+      - name: Verify bootstrap C and C++ cache hits
+        shell: bash
+        run: |
+          set -euo pipefail
+          /alpine/enter-chroot bash scripts/check-ccache.sh "$ARCH" 2>&1 | tee test-results/ccache-probe.log
       - name: Compile and inspect packaged C/C++ applications
         shell: bash
         run: |
@@ -86,6 +115,20 @@ jobs:
           name: release-${{ matrix.output }}
           path: dyne-gcc-musl-${{ matrix.output }}.tar.xz
           if-no-files-found: error
+      - name: Report cache statistics and restore runner ownership
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p test-results
+          status=0
+          if [[ -x /alpine/enter-chroot ]]; then
+            /alpine/enter-chroot ccache --show-stats 2>&1 | tee test-results/ccache.log || status=$?
+          fi
+          if [[ -d $CCACHE_DIR ]]; then
+            sudo chown -R "$(id -u):$(id -g)" "$CCACHE_DIR"
+          fi
+          exit "$status"
       - name: Retain diagnostic evidence on success and failure
         if: always()
         uses: actions/upload-artifact@v6
