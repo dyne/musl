@@ -124,7 +124,7 @@ Makefile when updating; ISL is unselected. C/C++ are enabled. The default host
 tools use static linking, -Os and x86-64-v2; NLS, sanitizer, mudflap and LTO are
 disabled. Host ccache is used when available, including musl's in-tree xgcc and
 GCC target runtimes through STAGE_CC_WRAPPER. The frontend-content namespace
-helper also wraps library configure/build/install commands; do not replace
+helper also hashes the target assembler and wraps library configure/build/install commands; do not replace
 generated target compiler flags or add unsafe ccache timestamp sloppiness.
 Both flavors build musl's static archive with `-fPIC` for static-PIE linkage;
 PIE applications must compile their own objects with `-fPIE` too.

@@ -76,8 +76,8 @@ class GitSources(Workspace):
 class CompilerCache(Workspace):
     def setUp(self):
         super().setUp()
-        self.toolchain = self.work / "compiler with spaces"
-        self.toolchain.mkdir()
+        self.toolchain = self.work / "obj_gcc/compiler with spaces"
+        self.toolchain.mkdir(parents=True)
         self.compiler = self.toolchain / "gcc"
         self.compiler.write_text('#!/bin/sh\nexec ' + shlex.quote(shutil.which("cc")) + ' "$@"\n')
         self.compiler.chmod(0o755)
@@ -96,6 +96,17 @@ class CompilerCache(Workspace):
         os.utime(self.compiler, ns=(old.st_atime_ns, old.st_mtime_ns + 1_000_000_000))
         self.assertEqual(self.namespace(), before)
         (self.toolchain / "cc1plus").write_text("frontend v2\n")
+        self.assertNotEqual(self.namespace(), before)
+
+    def test_bootstrap_assembler_changes_namespace(self):
+        assembler = self.work / "obj_binutils/gas/as-new"
+        assembler.parent.mkdir(parents=True, exist_ok=True)
+        assembler.write_text("assembler v1\n")
+        before = self.namespace()
+        old = assembler.stat()
+        os.utime(assembler, ns=(old.st_atime_ns, old.st_mtime_ns + 1_000_000_000))
+        self.assertEqual(self.namespace(), before)
+        assembler.write_text("assembler v2\n")
         self.assertNotEqual(self.namespace(), before)
 
     def test_without_ccache_command_arguments_and_status_are_preserved(self):

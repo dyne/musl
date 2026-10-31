@@ -46,10 +46,10 @@ retained with the build logs.
 Host compiler/binutils builds use ccache through `COMMON_CONFIG`. musl uses the
 in-tree xgcc through ccache; libgcc/libstdc++ use GCC's `STAGE_CC_WRAPPER` hook,
 preserving generated sysroot and compiler flags. Library builds also use ccache.
-`scripts/compiler-cache.sh` fingerprints the driver and C/C++ frontend contents
+`scripts/compiler-cache.sh` fingerprints the driver, C/C++ frontends and target assembler
 once per build command and selects a cache namespace. This lets identical
 compiler contents survive timestamp changes while preventing different
-frontends from sharing results. The initial host GCC build precedes this helper
+frontends or assemblers from sharing results. The initial host GCC build precedes this helper
 because its xgcc/frontends do not exist yet. No unsafe timestamp sloppiness is set.
 
 For a local build with a host ccache:
