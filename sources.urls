@@ -1,4 +1,4 @@
-config.sub.3d5db9ebe860 git+https://git.savannah.gnu.org/git/config.git#3d5db9ebe8607382d17d60faf8853c944fc5f353:config.sub
+config.sub.3d5db9ebe860 https://raw.githubusercontent.com/coreutils/gnulib/52b0cbbc7bc3be8137ea0a71be48f62d68aa98ff/build-aux/config.sub
 binutils-2.47.tar.xz https://ftp.gnu.org/gnu/binutils/binutils-2.47.tar.xz
 gcc-16.2.0.tar.xz https://ftp.gnu.org/gnu/gcc/gcc-16.2.0/gcc-16.2.0.tar.xz
 gmp-6.3.0.tar.xz https://ftp.gnu.org/gnu/gmp/gmp-6.3.0.tar.xz
