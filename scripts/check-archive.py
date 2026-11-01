@@ -18,9 +18,17 @@ def check(arch, archive):
     required.update(compiler + "/bin/" + arch + "-" + tool for tool in ["gcc", "g++", "ar", "strip", "readelf"])
     required.update(compiler + "/" + arch + "/lib/" + lib for lib in ["libstdc++.a", "libatomic.a"])
     required.update(target + "/lib/lib" + lib + ".a" for lib in
-                    ["ssl", "crypto", "z", "curl", "ssh2", "ncursesw", "kyotocabinet"])
+                    ["ssl", "crypto", "z", "curl", "ssh2", "ncursesw", "kyotocabinet", "sqlite3", "gmp", "nettle", "hogweed", "gnutls", "sodium", "zmq"])
     required.update(target + "/include/" + header for header in
-                    ["openssl/ssl.h", "zlib.h", "curl/curl.h", "libssh2.h", "ncursesw/curses.h", "kccachedb.h"])
+                    ["openssl/ssl.h", "zlib.h", "curl/curl.h", "libssh2.h", "ncursesw/curses.h", "kccachedb.h",
+                     "boost/version.hpp", "boost/multi_index_container.hpp", "boost/test/included/unit_test.hpp",
+                     "sqlite3.h", "sqlite3ext.h", "zmq.h", "gmp.h", "nettle/version.h", "gnutls/gnutls.h", "sodium.h"])
+    required.update(target + "/lib/" + metadata for metadata in
+                    ["pkgconfig/sqlite3.pc", "pkgconfig/libzmq.pc", "pkgconfig/gmp.pc", "pkgconfig/nettle.pc",
+                     "pkgconfig/hogweed.pc", "pkgconfig/gnutls.pc", "pkgconfig/libsodium.pc", "cmake/ZeroMQ/ZeroMQConfig.cmake"])
+    required.update(target + "/share/licenses/" + license for license in
+                    ["boost/LICENSE_1_0.txt", "zeromq/LICENSE", "libsodium/LICENSE",
+                     "gmp/COPYING", "nettle/COPYING.LESSERv3", "gnutls/COPYING.LESSERv2"])
     with tarfile.open(archive, "r:xz") as package:
         members = package.getmembers()
         for member in members:
@@ -33,6 +41,11 @@ def check(arch, archive):
         missing = required - {str(PurePosixPath(m.name)) for m in members if m.isfile() or m.issym() or m.islnk()}
         if missing:
             raise ValueError("missing package files: " + ", ".join(sorted(missing)))
+        names = {str(PurePosixPath(m.name)) for m in members if m.isfile()}
+        for pattern in [target + "/lib/cmake/Boost-*/BoostConfig.cmake",
+                        target + "/lib/cmake/boost_headers-*/boost_headers-config.cmake"]:
+            if not any(fnmatch.fnmatch(name, pattern) for name in names):
+                raise ValueError("missing package metadata: " + pattern)
 
 
 if __name__ == "__main__":

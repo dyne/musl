@@ -1,0 +1,56 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -200,7 +200,13 @@
+   option(WITH_NSS "Use NSS instead of builtin sha1" OFF)
+ 
+   if(WITH_TLS)
+-    find_package("GnuTLS" 3.6.7)
++    set(_zmq_pkg_config_argn "${PKG_CONFIG_ARGN}")
++    list(APPEND PKG_CONFIG_ARGN --static)
++    pkg_check_modules(ZMQ_GNUTLS REQUIRED IMPORTED_TARGET gnutls>=3.6.7)
++    set(PKG_CONFIG_ARGN "${_zmq_pkg_config_argn}")
++    set(GNUTLS_FOUND TRUE)
++    set(GNUTLS_INCLUDE_DIR "${ZMQ_GNUTLS_INCLUDE_DIRS}")
++    set(GNUTLS_LIBRARIES PkgConfig::ZMQ_GNUTLS)
+     if(GNUTLS_FOUND)
+       set(pkg_config_names_private "${pkg_config_names_private} gnutls")
+       list(APPEND sources ${CMAKE_CURRENT_SOURCE_DIR}/src/wss_address.hpp
+@@ -265,7 +271,14 @@
+ 
+ if(ENABLE_CURVE)
+   if(WITH_LIBSODIUM)
+-    find_package("sodium")
++    set(_zmq_pkg_config_argn "${PKG_CONFIG_ARGN}")
++    list(APPEND PKG_CONFIG_ARGN --static)
++    pkg_check_modules(ZMQ_SODIUM REQUIRED IMPORTED_TARGET libsodium)
++    set(PKG_CONFIG_ARGN "${_zmq_pkg_config_argn}")
++    set(SODIUM_FOUND TRUE)
++    set(SODIUM_INCLUDE_DIRS "${ZMQ_SODIUM_INCLUDE_DIRS}")
++    set(SODIUM_LIBRARIES PkgConfig::ZMQ_SODIUM)
++    set(pkg_config_names_private "${pkg_config_names_private} libsodium")
+     if(SODIUM_FOUND)
+       message(STATUS "Using libsodium for CURVE security")
+       include_directories(${SODIUM_INCLUDE_DIRS})
+--- a/builds/cmake/ZeroMQConfig.cmake.in
++++ b/builds/cmake/ZeroMQConfig.cmake.in
+@@ -16,6 +16,20 @@
+ 
+ @PACKAGE_INIT@
+ 
++include(CMakeFindDependencyMacro)
++find_dependency(Threads)
++find_dependency(PkgConfig)
++set(_zmq_pkg_config_argn "${PKG_CONFIG_ARGN}")
++list(APPEND PKG_CONFIG_ARGN --static)
++if(@ZMQ_USE_GNUTLS@)
++  pkg_check_modules(ZMQ_GNUTLS REQUIRED IMPORTED_TARGET gnutls>=3.6.7)
++endif()
++if(@ZMQ_USE_LIBSODIUM@)
++  pkg_check_modules(ZMQ_SODIUM REQUIRED IMPORTED_TARGET libsodium)
++endif()
++set(PKG_CONFIG_ARGN "${_zmq_pkg_config_argn}")
++unset(_zmq_pkg_config_argn)
++
+ if(NOT TARGET libzmq AND NOT TARGET libzmq-static)
+   include("${CMAKE_CURRENT_LIST_DIR}/@PROJECT_NAME@Targets.cmake")
+ 

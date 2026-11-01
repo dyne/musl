@@ -18,7 +18,7 @@ chroot: /alpine/enter-chroot
 /alpine/enter-chroot:
 	./alpine-chroot-install -a x86_64 -b $(ALPINE_BRANCH) -d /alpine \
 		-k 'ARCH CI QEMU_EMULATOR TRAVIS_.* CCACHE_.*' \
-		-p 'bash make cmake gcc build-base musl-dev curl git patch gawk ccache perl rsync xz samurai coreutils-fmt file binutils python3'
+		-p 'bash make cmake gcc build-base musl-dev curl git patch gawk ccache perl rsync xz samurai pkgconf coreutils-fmt file binutils python3'
 
 # Always enter sub-builds; their own state decides what needs rebuilding.
 gcc:
