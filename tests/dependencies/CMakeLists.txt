@@ -1,5 +1,8 @@
 cmake_minimum_required(VERSION 3.22)
 project(DyneDependencySmoke LANGUAGES C CXX)
+include(CheckPIESupported)
+check_pie_supported()
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 # Exercise the installed package metadata used by Bitcoin Core, rather than
 # substituting include/library paths that could hide a broken SDK package.

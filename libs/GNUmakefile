@@ -114,7 +114,7 @@ $(T)/lib/libssl.a $(T)/lib/libcrypto.a &: $(B)/$(LIBSSL)/.extracted
 $(T)/lib/libz.a: $(B)/$(ZLIB)/.extracted
 	$(CACHE_ENV) cmake -S "$(B)/$(ZLIB)" -B "$(B)/$(ZLIB)/build" $(CMAKE_FLAGS) \
 		-DZLIB_COMPAT=ON -DZLIB_ENABLE_TESTS=OFF -DZLIBNG_ENABLE_TESTS=OFF \
-		-DWITH_SANITIZER=OFF -DWITH_GTEST=OFF -DBUILD_SHARED_LIBS=OFF
+		-DWITH_SANITIZER=OFF -DWITH_GTEST=OFF -DBUILD_SHARED_LIBS=OFF -DCMAKE_POSITION_INDEPENDENT_CODE=ON
 	$(CACHE_ENV) cmake --build "$(B)/$(ZLIB)/build" --parallel $(JOBS)
 	$(CACHE_ENV) cmake --install "$(B)/$(ZLIB)/build"
 	sed -i -e 's|^prefix=.*|prefix=$${pcfiledir}/../..|' \
