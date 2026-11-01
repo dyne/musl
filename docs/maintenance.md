@@ -285,7 +285,9 @@ signature check on every build. Normal builds verify all selected SHA-256 pins.
 
 GnuTLS needs Nettle >= 3.10; Nettle 4 is an API change, so use the maintained
 3.x line until a clean build proves compatibility. GMP's old configure probes
-need `-std=gnu17` with GCC 16's default C23. New static package metadata and
+need `-std=gnu17` with GCC 16's default C23, and its assembly build needs host
+`m4`. The Alpine package list includes it. CMake launcher discovery uses the
+host PATH, excluding packaged foreign-target `bin/ccache` executables. New static package metadata and
 ZeroMQ patches are covered by file targets and fingerprint tests; missing
 metadata triggers reinstallation. Read [bitcoin.md](bitcoin.md) before changing
 this graph or enabling more optional crypto libraries.

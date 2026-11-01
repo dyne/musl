@@ -47,7 +47,10 @@ if(FOR_MUSL_DYNE)
   set(CMAKE_INSTALL_PREFIX "${TARGET_PREFIX}" CACHE PATH "Install prefix" FORCE)
 endif()
 if(CCACHE)
-  find_program(DYNE_HOST_CCACHE ccache REQUIRED NO_CMAKE_FIND_ROOT_PATH)
+  # CMAKE_PREFIX_PATH includes target/bin, which can contain a foreign ccache.
+  # A host launcher must come from the host PATH (or an explicit cache value).
+  find_program(DYNE_HOST_CCACHE ccache REQUIRED PATHS ENV PATH
+    NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH)
   set(CMAKE_C_COMPILER_LAUNCHER "${DYNE_HOST_CCACHE}")
   set(CMAKE_CXX_COMPILER_LAUNCHER "${DYNE_HOST_CCACHE}")
 endif()
