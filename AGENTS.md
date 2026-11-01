@@ -202,7 +202,9 @@ ROOT changes the base path; TOOLCHAIN_PREFIX and TARGET_PREFIX can override the
 compiler and additional-library locations separately. CMake uses the compiler's
 libc sysroot and restricts library/header/package lookup to target roots; build
 programs remain host tools. FOR_MUSL_DYNE installs into TARGET_PREFIX.
-CCACHE defaults ON for consumers: provide host ccache or use `-DCCACHE=OFF`.
+CCACHE defaults ON for consumers: provide host ccache on PATH or use `-DCCACHE=OFF`.
+Launcher discovery excludes the target prefix, whose packaged ccache may be a
+foreign executable. GMP assembly generation requires host m4 (installed in Alpine).
 FORCE_STATIC adds static runtime linker flags.
 
 Preparation uses Bash, validates ARCH and uses target strip for target files

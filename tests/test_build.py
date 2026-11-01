@@ -532,6 +532,23 @@ class Release(Workspace):
 
 
 class CMakeSettings(Workspace):
+    def test_host_ccache_lookup_ignores_target_package_binary(self):
+        host_bin = self.work / "host/bin"
+        target_bin = self.work / "dyne/arm-linux-musleabihf/bin"
+        for directory in [host_bin, target_bin]:
+            directory.mkdir(parents=True)
+            executable = directory / "ccache"
+            executable.write_text("#!/bin/sh\nexit 99\n")
+            executable.chmod(0o755)
+        (self.work / "CMakeLists.txt").write_text(
+            'cmake_minimum_required(VERSION 3.20)\nproject(Fixture NONE)\n'
+            'file(WRITE "${CMAKE_BINARY_DIR}/launcher" "${CMAKE_C_COMPILER_LAUNCHER}")\n')
+        self.ok(run("cmake", "-S", str(self.work), "-B", str(self.work / "build"),
+                    "-DCMAKE_TOOLCHAIN_FILE=" + str(ROOT / "settings.cmake"),
+                    "-DROOT=" + str(self.work), "-DARCH=arm-linux-musleabihf", "-DCCACHE=ON",
+                    env=dict(os.environ, PATH=str(host_bin) + os.pathsep + os.environ["PATH"])))
+        self.assertEqual((self.work / "build/launcher").read_text(), str(host_bin / "ccache"))
+
     def test_documented_install_option_sysroot_and_user_flags(self):
         (self.work / "CMakeLists.txt").write_text(
             'cmake_minimum_required(VERSION 3.20)\nproject(Fixture NONE)\n'
