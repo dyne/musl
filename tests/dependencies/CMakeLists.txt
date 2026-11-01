@@ -27,3 +27,14 @@ list(APPEND PKG_CONFIG_ARGN --static)
 pkg_check_modules(SDK_STATIC REQUIRED IMPORTED_TARGET libzmq sqlite3)
 add_executable(pkgconfig pkgconfig.c)
 target_link_libraries(pkgconfig PRIVATE PkgConfig::SDK_STATIC)
+
+# avena's core/WebSocket modules have no external libraries. Its TLS module
+# needs the OpenSSL-compatible static SSL/crypto interface supplied by LibreSSL.
+set(OPENSSL_USE_STATIC_LIBS TRUE)
+find_package(OpenSSL 1.1 REQUIRED)
+add_executable(avena-dependencies avena.cpp)
+# Match avena's static executable linkage; LibreSSL archives need not be PIC.
+set_target_properties(avena-dependencies PROPERTIES POSITION_INDEPENDENT_CODE OFF)
+target_compile_features(avena-dependencies PRIVATE cxx_std_17)
+target_link_libraries(avena-dependencies PRIVATE OpenSSL::SSL OpenSSL::Crypto
+  Threads::Threads ${CMAKE_DL_LIBS} atomic)

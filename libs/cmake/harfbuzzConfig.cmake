@@ -1,0 +1,10 @@
+# Dyne's static HarfBuzz/FreeType package: reconstruct the relocatable closure.
+include(CMakeFindDependencyMacro)
+find_dependency(Threads)
+find_dependency(PkgConfig)
+set(_hb_pkgconfig_args "${PKG_CONFIG_ARGN}")
+list(APPEND PKG_CONFIG_ARGN --static)
+pkg_check_modules(HB_FREETYPE REQUIRED IMPORTED_TARGET freetype2)
+set(PKG_CONFIG_ARGN "${_hb_pkgconfig_args}")
+unset(_hb_pkgconfig_args)
+include("${CMAKE_CURRENT_LIST_DIR}/harfbuzz-targets.cmake")

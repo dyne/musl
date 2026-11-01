@@ -82,6 +82,14 @@ WSS on native x86_64. See [the dependency profile and update procedure](bitcoin.
 x86_64 applications and ccache are also executed. Foreign execution needs target
 hardware or an emulator; a cross-link/ELF pass alone is not a runtime test.
 
+The [headless SDL3 profile](sdl3.md) also exercises offscreen software rendering,
+PNG/JPEG images, FreeType rasterization and HarfBuzz Arabic shaping. CMake and
+pure-C pkg-config consumers must link statically, including after moving the
+SDK with its original prefix unavailable. Python 3 generates the test font;
+no system font package or desktop session is required.
+The [Dear ImGui consumer](imgui.md) additionally renders widgets and font-atlas
+pixels through SDL3's software backend, checking both installed package interfaces.
+
 For a quick library-only reproduction with an existing verified compiler:
 
 ```sh

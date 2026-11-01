@@ -161,15 +161,18 @@ class LibraryBuilds(Workspace):
         cache = self.work / ".cache/sources"
         cache.mkdir(parents=True)
         recipe = (ROOT / "libs/GNUmakefile").read_text()
-        packages = dict(re.findall(r"^(LIBSSL|ZLIB|CURL|SSH2|CCACHE|NCURSES|KYOTOCAB|BOOST|SQLITE|ZMQ|GMP|NETTLE|GNUTLS|SODIUM) \?= (\S+)$",
+        packages = dict(re.findall(r"^(LIBSSL|ZLIB|CURL|SSH2|CCACHE|NCURSES|KYOTOCAB|BOOST|SQLITE|ZMQ|GMP|NETTLE|GNUTLS|SODIUM|SDL|SDLIMAGE|SDLTTF|FREETYPE|HARFBUZZ|IMGUI) \?= (\S+)$",
                                    recipe, re.MULTILINE))
         archives = [packages[key] + suffix for key, suffix in
                     [("LIBSSL", ".tar.gz"), ("ZLIB", ".tar.gz"), ("CURL", ".tar.xz"),
                      ("SSH2", ".tar.xz"), ("CCACHE", ".tar.xz"), ("NCURSES", ".tar.gz"),
                      ("KYOTOCAB", ".tar.gz"), ("BOOST", ".tar.xz"), ("SQLITE", ".tar.gz"),
                      ("ZMQ", ".tar.gz"), ("GMP", ".tar.xz"), ("NETTLE", ".tar.gz"),
-                     ("GNUTLS", ".tar.xz"), ("SODIUM", ".tar.gz")]]
+                     ("GNUTLS", ".tar.xz"), ("SODIUM", ".tar.gz"), ("SDL", ".tar.gz"),
+                     ("SDLIMAGE", ".tar.gz"), ("SDLTTF", ".tar.gz"), ("FREETYPE", ".tar.xz"),
+                     ("HARFBUZZ", ".tar.xz"), ("IMGUI", ".tar.gz")]]
         shutil.copytree(ROOT / "libs/patches", self.work / "libs/patches")
+        shutil.copytree(ROOT / "libs/cmake", self.work / "libs/cmake")
         self.ssl_package = packages["LIBSSL"]
         self.curl_archive = packages["CURL"] + ".tar.xz"
         manifest = []
@@ -196,9 +199,12 @@ class LibraryBuilds(Workspace):
                 recipe += '\t@test -f "$(T)/lib/libssh2.a" && test -f "$(T)/lib/libz.a"\n'
             recipe += f'\t@touch "$@"\n\t@echo {name} >> "$(T)/order"\n'
         recipe += '\n$(B)/$(ZMQ)/.patched:\n\t@touch "$@"\n'
+        recipe += '\n$(B)/$(HARFBUZZ)/.patched:\n\t@touch "$@"\n'
         for variable, name in [("BOOST", "boost"), ("SQLITE", "sqlite"), ("GMP", "gmp"),
                                ("NETTLE", "nettle"), ("GNUTLS", "gnutls"), ("SODIUM", "sodium"),
-                               ("ZMQ", "zmq")]:
+                               ("ZMQ", "zmq"), ("SDL", "sdl"), ("SDLIMAGE", "sdlimage"),
+                               ("SDLTTF", "sdlttf"), ("FREETYPE", "freetype"), ("HARFBUZZ", "harfbuzz"),
+                               ("IMGUI", "imgui")]:
             recipe += f'\n$({variable}_OUTPUTS) &:\n'
             recipe += f'\t@for output in $({variable}_OUTPUTS); do mkdir -p "$$(dirname "$$output")"; touch "$$output"; done\n'
             recipe += f'\t@echo {name} >> "$(T)/order"\n'
@@ -219,11 +225,14 @@ class LibraryBuilds(Workspace):
         self.make("libs")
         first = self.order()
         self.assertEqual(set(first), {"ssl", "z", "ssh", "curl", "ncurses", "kyoto", "ccache",
-                                      "boost", "sqlite", "gmp", "nettle", "gnutls", "sodium", "zmq"})
+                                      "boost", "sqlite", "gmp", "nettle", "gnutls", "sodium", "zmq",
+                                      "sdl", "sdlimage", "sdlttf", "freetype", "harfbuzz", "imgui"})
         self.assertLess(first.index("ssl"), first.index("ssh"))
         self.assertLess(first.index("ssh"), first.index("curl"))
         for dependency, dependent in [("gmp", "nettle"), ("nettle", "gnutls"),
-                                      ("z", "gnutls"), ("gnutls", "zmq"), ("sodium", "zmq")]:
+                                      ("z", "gnutls"), ("gnutls", "zmq"), ("sodium", "zmq"),
+                                      ("sdl", "sdlimage"), ("sdl", "sdlttf"), ("z", "freetype"),
+                                      ("freetype", "harfbuzz"), ("harfbuzz", "sdlttf"), ("sdl", "imgui")]:
             self.assertLess(first.index(dependency), first.index(dependent))
         self.make("libs")
         self.assertEqual(self.order(), first)
@@ -250,7 +259,7 @@ class LibraryBuilds(Workspace):
         before = (self.target / "lib/libcurl.a").stat().st_mtime_ns
         (self.target / "obsolete-header.h").touch()
         self.make("libs", "CFLAGS=-Os -DCHANGED")
-        self.assertEqual(len(self.order()), 14)
+        self.assertEqual(len(self.order()), 20)
         self.assertGreater((self.target / "lib/libcurl.a").stat().st_mtime_ns, before)
         self.assertFalse((self.target / "obsolete-header.h").exists())
         self.make("libs", "ARCH=arm-linux-musleabihf")
@@ -300,7 +309,35 @@ class LibraryBuilds(Workspace):
         patch.write_text(patch.read_text() + "\n")
         self.make("libs")
         self.assertFalse(marker.exists())
-        self.assertEqual(len(self.order()), 14)
+        self.assertEqual(len(self.order()), 20)
+
+    def test_missing_sdl_metadata_and_font_header_rebuild_dependency_closure(self):
+        self.make("libs")
+        before = len(self.order())
+        (self.target / "lib/cmake/SDL3/SDL3Config.cmake").unlink()
+        self.make("libs")
+        self.assertEqual(set(self.order()[before:]), {"sdl", "sdlimage", "sdlttf", "imgui"})
+        before = len(self.order())
+        (self.target / "include/freetype2/ft2build.h").unlink()
+        self.make("libs")
+        self.assertEqual(self.order()[before:], ["freetype", "harfbuzz", "sdlttf"])
+        before = len(self.order())
+        (self.target / "include/imgui/backends/imgui_impl_sdl3.h").unlink()
+        self.make("libs")
+        self.assertEqual(self.order()[before:], ["imgui"])
+
+    def test_font_patch_and_package_helper_changes_invalidate_staged_prefix(self):
+        self.make("libs")
+        inputs = [next((self.work / "libs/patches").glob("harfbuzz-*/*.patch")),
+                  self.work / "libs/cmake/harfbuzzConfig.cmake",
+                  self.work / "libs/cmake/imgui/CMakeLists.txt"]
+        for package_input in inputs:
+            marker = self.target / "obsolete-font-metadata"
+            marker.touch()
+            package_input.write_text(package_input.read_text() + "\n")
+            self.make("libs")
+            self.assertFalse(marker.exists())
+            self.assertEqual(len(self.order()), 20)
 
 
 class ToolchainState(Workspace):

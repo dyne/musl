@@ -1,0 +1,12 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -323,3 +323,8 @@
+-  list(APPEND THIRD_PARTY_LIBS ${FREETYPE_LIBRARIES})
++  find_package(PkgConfig REQUIRED)
++  set(_hb_pkgconfig_args "${PKG_CONFIG_ARGN}")
++  list(APPEND PKG_CONFIG_ARGN --static)
++  pkg_check_modules(HB_FREETYPE REQUIRED IMPORTED_TARGET freetype2)
++  set(PKG_CONFIG_ARGN "${_hb_pkgconfig_args}")
++  list(APPEND THIRD_PARTY_LIBS PkgConfig::HB_FREETYPE)
+   include_directories(AFTER ${FREETYPE_INCLUDE_DIRS})
+   add_compile_definitions(HAVE_FREETYPE=1)
