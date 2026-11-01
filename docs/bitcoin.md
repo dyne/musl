@@ -77,6 +77,7 @@ through target pkg-config metadata. The toolchain clears host `PKG_CONFIG_PATH`
 and restricts `PKG_CONFIG_LIBDIR` to the selected target prefix. Plain consumers
 can use `pkg-config --static --cflags --libs libzmq` with that same target-only
 database. New package `.pc` files and CMake exports work after relocating the SDK.
+The new libraries and zlib-ng are built as PIC for static PIE applications.
 
 Update the version variables in `libs/GNUmakefile` and the matching exact URL
 and SHA-256 entries in `sources.urls`/`sources.sha256`. GMP shares its archive pin

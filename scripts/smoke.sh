@@ -37,7 +37,8 @@ for binary in "$build/toolchain" "$build/static-pie" "$build/static-and-pie" \
         exit 1
     fi
 done
-for binary in "$build/static-pie" "$build/static-and-pie"; do
+for binary in "$build/static-pie" "$build/static-and-pie" \
+    "$build/dependencies/dependencies" "$build/dependencies/pkgconfig"; do
     "$readelf" -h "$binary" | grep -Eq 'Type:[[:space:]]+DYN'
 done
 if [[ $arch == x86_64-linux-musl && $(uname -m) == x86_64 ]]; then
