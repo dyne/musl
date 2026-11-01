@@ -141,7 +141,7 @@ class Downloads(Workspace):
         for directory, target in [("gcc-musl", "fetch-sources"), ("libs", "fetch")]:
             self.ok(run("make", "-C", directory, target, "SOURCES_URL=" + base + "/missing",
                         cwd=self.work))
-        self.assertEqual(sorted(self.requests), sorted("/upstream/" + name for name in names))
+        self.assertEqual(sorted(self.requests), sorted("/upstream/" + name for name in names + [next(n for n in names if n.startswith("gmp-"))]))
         self.assertEqual((self.work / "gcc-musl/sources/config.sub").read_bytes(), self.payload)
         before = list(self.requests)
         for directory, target in [("gcc-musl", "fetch-sources"), ("libs", "fetch")]:
@@ -161,12 +161,15 @@ class LibraryBuilds(Workspace):
         cache = self.work / ".cache/sources"
         cache.mkdir(parents=True)
         recipe = (ROOT / "libs/GNUmakefile").read_text()
-        packages = dict(re.findall(r"^(LIBSSL|ZLIB|CURL|SSH2|CCACHE|NCURSES|KYOTOCAB) \?= (\S+)$",
+        packages = dict(re.findall(r"^(LIBSSL|ZLIB|CURL|SSH2|CCACHE|NCURSES|KYOTOCAB|BOOST|SQLITE|ZMQ|GMP|NETTLE|GNUTLS|SODIUM) \?= (\S+)$",
                                    recipe, re.MULTILINE))
         archives = [packages[key] + suffix for key, suffix in
                     [("LIBSSL", ".tar.gz"), ("ZLIB", ".tar.gz"), ("CURL", ".tar.xz"),
                      ("SSH2", ".tar.xz"), ("CCACHE", ".tar.xz"), ("NCURSES", ".tar.gz"),
-                     ("KYOTOCAB", ".tar.gz")]]
+                     ("KYOTOCAB", ".tar.gz"), ("BOOST", ".tar.xz"), ("SQLITE", ".tar.gz"),
+                     ("ZMQ", ".tar.gz"), ("GMP", ".tar.xz"), ("NETTLE", ".tar.gz"),
+                     ("GNUTLS", ".tar.xz"), ("SODIUM", ".tar.gz")]]
+        shutil.copytree(ROOT / "libs/patches", self.work / "libs/patches")
         self.ssl_package = packages["LIBSSL"]
         self.curl_archive = packages["CURL"] + ".tar.xz"
         manifest = []
@@ -192,6 +195,13 @@ class LibraryBuilds(Workspace):
             if name == "curl":
                 recipe += '\t@test -f "$(T)/lib/libssh2.a" && test -f "$(T)/lib/libz.a"\n'
             recipe += f'\t@touch "$@"\n\t@echo {name} >> "$(T)/order"\n'
+        recipe += '\n$(B)/$(ZMQ)/.patched:\n\t@touch "$@"\n'
+        for variable, name in [("BOOST", "boost"), ("SQLITE", "sqlite"), ("GMP", "gmp"),
+                               ("NETTLE", "nettle"), ("GNUTLS", "gnutls"), ("SODIUM", "sodium"),
+                               ("ZMQ", "zmq")]:
+            recipe += f'\n$({variable}_OUTPUTS) &:\n'
+            recipe += f'\t@for output in $({variable}_OUTPUTS); do mkdir -p "$$(dirname "$$output")"; touch "$$output"; done\n'
+            recipe += f'\t@echo {name} >> "$(T)/order"\n'
         (self.work / "libs/GNUmakefile").write_text(recipe)
         with (self.work / "GNUmakefile").open("a") as f:
             f.write('\ngcc:\n\t@echo gcc >> gcc-invocations\n')
@@ -208,9 +218,13 @@ class LibraryBuilds(Workspace):
         (self.target / "lib/libssl.a").touch()
         self.make("libs")
         first = self.order()
-        self.assertEqual(set(first), {"ssl", "z", "ssh", "curl", "ncurses", "kyoto", "ccache"})
+        self.assertEqual(set(first), {"ssl", "z", "ssh", "curl", "ncurses", "kyoto", "ccache",
+                                      "boost", "sqlite", "gmp", "nettle", "gnutls", "sodium", "zmq"})
         self.assertLess(first.index("ssl"), first.index("ssh"))
         self.assertLess(first.index("ssh"), first.index("curl"))
+        for dependency, dependent in [("gmp", "nettle"), ("nettle", "gnutls"),
+                                      ("z", "gnutls"), ("gnutls", "zmq"), ("sodium", "zmq")]:
+            self.assertLess(first.index(dependency), first.index(dependent))
         self.make("libs")
         self.assertEqual(self.order(), first)
         self.assertEqual((self.work / "gcc-invocations").read_text().splitlines(), ["gcc", "gcc"])
@@ -236,7 +250,7 @@ class LibraryBuilds(Workspace):
         before = (self.target / "lib/libcurl.a").stat().st_mtime_ns
         (self.target / "obsolete-header.h").touch()
         self.make("libs", "CFLAGS=-Os -DCHANGED")
-        self.assertEqual(len(self.order()), 7)
+        self.assertEqual(len(self.order()), 14)
         self.assertGreater((self.target / "lib/libcurl.a").stat().st_mtime_ns, before)
         self.assertFalse((self.target / "obsolete-header.h").exists())
         self.make("libs", "ARCH=arm-linux-musleabihf")
@@ -245,7 +259,7 @@ class LibraryBuilds(Workspace):
 
     def test_clean_removes_headers_metadata_ncurses_and_kyoto(self):
         self.make("libs")
-        (self.target / "include").mkdir()
+        (self.target / "include").mkdir(exist_ok=True)
         (self.target / "include/stale.h").touch()
         self.ok(run("make", "-C", "libs", "clean", cwd=self.work))
         self.assertFalse(self.target.exists())
@@ -266,6 +280,27 @@ class LibraryBuilds(Workspace):
         state.write_text("updated libc source patch\n")
         self.make("libs")
         self.assertGreater((self.target / "lib/libcurl.a").stat().st_mtime_ns, before)
+
+    def test_missing_secure_metadata_reinstalls_and_relinks_dependents(self):
+        self.make("libs")
+        before = len(self.order())
+        (self.target / "lib/pkgconfig/gnutls.pc").unlink()
+        self.make("libs")
+        self.assertEqual(self.order()[before:], ["gnutls", "zmq"])
+        before = len(self.order())
+        (self.target / "lib/cmake/ZeroMQ/ZeroMQConfig.cmake").unlink()
+        self.make("libs")
+        self.assertEqual(self.order()[before:], ["zmq"])
+
+    def test_library_patch_change_invalidates_build_and_obsolete_prefix(self):
+        self.make("libs")
+        marker = self.target / "obsolete.h"
+        marker.touch()
+        patch = next((self.work / "libs/patches").glob("*/*.patch"))
+        patch.write_text(patch.read_text() + "\n")
+        self.make("libs")
+        self.assertFalse(marker.exists())
+        self.assertEqual(len(self.order()), 14)
 
 
 class ToolchainState(Workspace):
@@ -501,15 +536,19 @@ class CMakeSettings(Workspace):
         (self.work / "CMakeLists.txt").write_text(
             'cmake_minimum_required(VERSION 3.20)\nproject(Fixture NONE)\n'
             'file(WRITE "${CMAKE_BINARY_DIR}/result" '
-            '"${CMAKE_INSTALL_PREFIX}\\n${CMAKE_SYSROOT}\\n${CMAKE_C_FLAGS}\\n${CMAKE_SYSTEM_PROCESSOR}")\n')
+            '"${CMAKE_INSTALL_PREFIX}\\n${CMAKE_SYSROOT}\\n${CMAKE_C_FLAGS}\\n${CMAKE_SYSTEM_PROCESSOR}\\n$ENV{PKG_CONFIG_LIBDIR}\\n$ENV{PKG_CONFIG_PATH}\\n$ENV{PKG_CONFIG_SYSROOT_DIR}\\n")\n')
         self.ok(run("cmake", "-S", str(self.work), "-B", str(self.work / "build"),
                     "-DCMAKE_TOOLCHAIN_FILE=" + str(ROOT / "settings.cmake"),
                     "-DROOT=" + str(self.work), "-DARCH=aarch64-linux-musl",
-                    "-DCCACHE=OFF", "-DFOR_MUSL_DYNE=ON", "-DCMAKE_C_FLAGS=-DCUSTOM"))
+                    "-DCCACHE=OFF", "-DFOR_MUSL_DYNE=ON", "-DCMAKE_C_FLAGS=-DCUSTOM",
+                    env=dict(os.environ, PKG_CONFIG_PATH="/host/packages",
+                             PKG_CONFIG_LIBDIR="/host/lib", PKG_CONFIG_SYSROOT_DIR="/host/sysroot")))
         values = (self.work / "build/result").read_text().splitlines()
         self.assertEqual(values, [str(self.work / "dyne/aarch64-linux-musl"),
                                   str(self.work / "dyne/gcc-musl/aarch64-linux-musl"),
-                                  "-DCUSTOM", "aarch64"])
+                                  "-DCUSTOM", "aarch64",
+                                  str(self.work / "dyne/aarch64-linux-musl/lib/pkgconfig") + ":" +
+                                  str(self.work / "dyne/aarch64-linux-musl/share/pkgconfig"), "", ""])
 
 
 if __name__ == "__main__":

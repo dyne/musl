@@ -75,7 +75,10 @@ and the [ccache manual](https://ccache.dev/manual/latest.html).
 
 `make smoke ARCH=<tuple>` compiles C against curl, libssh2, LibreSSL, zlib and
 wide ncurses, plus C++20/thread/atomic/Kyoto Cabinet code. It checks ELF machine
-identity and absence of dynamic dependencies, including packaged ccache. Native
+identity and absence of dynamic dependencies, including packaged ccache.
+It also discovers installed Boost/SQLite/ZeroMQ packages through CMake, links
+GnuTLS and libsodium statically, and exercises CURVE and certificate-verified
+WSS on native x86_64. See [the dependency profile and update procedure](bitcoin.md). Native
 x86_64 applications and ccache are also executed. Foreign execution needs target
 hardware or an emulator; a cross-link/ELF pass alone is not a runtime test.
 
@@ -177,6 +180,12 @@ available before accepting new pins.
 | ccache | https://github.com/ccache/ccache/releases |
 | ncurses | https://ftp.gnu.org/gnu/ncurses/ |
 | Kyoto Cabinet | https://dbmx.net/kyotocabinet/pkg/ |
+| Boost headers | https://www.boost.org/releases/latest/ |
+| SQLite | https://sqlite.org/download.html |
+| ZeroMQ | https://github.com/zeromq/libzmq/releases |
+| libsodium | https://github.com/jedisct1/libsodium/releases |
+| GnuTLS | https://www.gnutls.org/download.html |
+| Nettle (compatible 3.x) | https://ftp.gnu.org/gnu/nettle/ |
 
 ### Repeatable upstream update procedure
 
@@ -259,6 +268,27 @@ PIE objects with `-fPIE`; smoke checks link and inspect both `-static-pie` and
 ccache's optional third-party source downloads are version/hash-pinned by the
 upstream build scripts inside its verified release archive. They are separate
 from this repository's top-level source mirror.
+
+## Added target dependencies (2026-11-01)
+
+Boost 1.92.0 and libsodium 1.0.22 archive SHA-256 values were compared with the
+GitHub release asset digests. SQLite 3.54.1 was compared with the download page's
+SHA3-256, then recorded as SHA-256. ZeroMQ 4.3.5 matches Bitcoin Core 32.1's
+pinned SHA-256. GnuTLS 3.8.13's detached release signatures were verified with
+the official GnuTLS release keyring (signing fingerprints
+`5D46CB0F763405A7053556F47A75A648B3F9220C` and
+`A6AB53A01D237A94F9EEC4D0412748A40AFCC2FB`). Nettle 3.10.2's SHA-256 was
+computed from the official GNU HTTPS archive; its signature has not been
+independently verified. GMP reuses the existing 6.3.0 compiler source pin.
+These describe the checks performed for this update, not an automatic trust or
+signature check on every build. Normal builds verify all selected SHA-256 pins.
+
+GnuTLS needs Nettle >= 3.10; Nettle 4 is an API change, so use the maintained
+3.x line until a clean build proves compatibility. GMP's old configure probes
+need `-std=gnu17` with GCC 16's default C23. New static package metadata and
+ZeroMQ patches are covered by file targets and fingerprint tests; missing
+metadata triggers reinstallation. Read [bitcoin.md](bitcoin.md) before changing
+this graph or enabling more optional crypto libraries.
 
 ## Release ordering and recovery
 

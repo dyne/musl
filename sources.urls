@@ -13,3 +13,9 @@ libssh2-1.11.1.tar.xz https://libssh2.org/download/libssh2-1.11.1.tar.xz
 ccache-4.14.2.tar.xz https://github.com/ccache/ccache/releases/download/v4.14.2/ccache-4.14.2.tar.xz
 ncurses-6.6.tar.gz https://ftp.gnu.org/gnu/ncurses/ncurses-6.6.tar.gz
 kyotocabinet-1.2.80.tar.gz https://dbmx.net/kyotocabinet/pkg/kyotocabinet-1.2.80.tar.gz
+boost-1.92.0.tar.xz https://github.com/boostorg/boost/releases/download/boost-1.92.0/boost-1.92.0-cmake.tar.xz
+sqlite-autoconf-3540100.tar.gz https://sqlite.org/2026/sqlite-autoconf-3540100.tar.gz
+zeromq-4.3.5.tar.gz https://github.com/zeromq/libzmq/releases/download/v4.3.5/zeromq-4.3.5.tar.gz
+nettle-3.10.2.tar.gz https://ftp.gnu.org/gnu/nettle/nettle-3.10.2.tar.gz
+gnutls-3.8.13.tar.xz https://www.gnupg.org/ftp/gcrypt/gnutls/v3.8/gnutls-3.8.13.tar.xz
+libsodium-1.0.22.tar.gz https://github.com/jedisct1/libsodium/releases/download/1.0.22-RELEASE/libsodium-1.0.22.tar.gz

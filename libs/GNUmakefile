@@ -33,12 +33,32 @@ SSH2 ?= libssh2-1.11.1
 CCACHE ?= ccache-4.14.2
 NCURSES ?= ncurses-6.6
 KYOTOCAB ?= kyotocabinet-1.2.80
+BOOST ?= boost-1.92.0
+SQLITE ?= sqlite-autoconf-3540100
+ZMQ ?= zeromq-4.3.5
+GMP ?= gmp-6.3.0
+NETTLE ?= nettle-3.10.2
+GNUTLS ?= gnutls-3.8.13
+SODIUM ?= libsodium-1.0.22
+BOOST_VERSION := $(patsubst boost-%,%,$(BOOST))
+ZMQ_PATCHES := $(sort $(wildcard patches/$(ZMQ)/*.patch))
 
-PACKAGES := $(LIBSSL) $(ZLIB) $(CURL) $(SSH2) $(CCACHE) $(NCURSES) $(KYOTOCAB)
-ARCHIVES := $(LIBSSL).tar.gz $(ZLIB).tar.gz $(CURL).tar.xz $(SSH2).tar.xz $(CCACHE).tar.xz $(NCURSES).tar.gz $(KYOTOCAB).tar.gz
+PACKAGES := $(LIBSSL) $(ZLIB) $(CURL) $(SSH2) $(CCACHE) $(NCURSES) $(KYOTOCAB) $(BOOST) $(SQLITE) $(GMP) $(NETTLE) $(GNUTLS) $(SODIUM) $(ZMQ)
+ARCHIVES := $(LIBSSL).tar.gz $(ZLIB).tar.gz $(CURL).tar.xz $(SSH2).tar.xz $(CCACHE).tar.xz $(NCURSES).tar.gz $(KYOTOCAB).tar.gz \
+	$(BOOST).tar.xz $(SQLITE).tar.gz $(GMP).tar.xz $(NETTLE).tar.gz $(GNUTLS).tar.xz $(SODIUM).tar.gz $(ZMQ).tar.gz
+BOOST_OUTPUTS := $(T)/include/boost/version.hpp $(T)/include/boost/multi_index_container.hpp \
+	$(T)/lib/cmake/Boost-$(BOOST_VERSION)/BoostConfig.cmake
+SQLITE_OUTPUTS := $(T)/lib/libsqlite3.a $(T)/include/sqlite3.h $(T)/lib/pkgconfig/sqlite3.pc
+ZMQ_OUTPUTS := $(T)/lib/libzmq.a $(T)/include/zmq.h $(T)/lib/cmake/ZeroMQ/ZeroMQConfig.cmake \
+	$(T)/lib/pkgconfig/libzmq.pc
+GMP_OUTPUTS := $(T)/lib/libgmp.a $(T)/include/gmp.h $(T)/lib/pkgconfig/gmp.pc
+NETTLE_OUTPUTS := $(T)/lib/libnettle.a $(T)/lib/libhogweed.a $(T)/include/nettle/version.h \
+	$(T)/lib/pkgconfig/nettle.pc $(T)/lib/pkgconfig/hogweed.pc
+GNUTLS_OUTPUTS := $(T)/lib/libgnutls.a $(T)/include/gnutls/gnutls.h $(T)/lib/pkgconfig/gnutls.pc
+SODIUM_OUTPUTS := $(T)/lib/libsodium.a $(T)/include/sodium.h $(T)/lib/pkgconfig/libsodium.pc
 OUTPUTS := $(T)/lib/libssl.a $(T)/lib/libcrypto.a $(T)/lib/libz.a \
 	$(T)/lib/libcurl.a $(T)/lib/libssh2.a $(T)/lib/libncursesw.a \
-	$(T)/lib/libkyotocabinet.a $(T)/bin/ccache
+	$(T)/lib/libkyotocabinet.a $(T)/bin/ccache $(BOOST_OUTPUTS) $(SQLITE_OUTPUTS) $(GMP_OUTPUTS) $(NETTLE_OUTPUTS) $(GNUTLS_OUTPUTS) $(SODIUM_OUTPUTS) $(ZMQ_OUTPUTS)
 CACHE_ENV = sh "$(R)/scripts/compiler-cache.sh" "$(CCACHE_LAUNCHER)" "$(TOOLCHAIN)/bin/$(ARCH)-gcc"
 AUTOCONF_ENV = $(CACHE_ENV) env CC="$(CC)" CXX="$(CXX)" AR="$(AR)" RANLIB="$(RANLIB)" \
 	CFLAGS="$(CFLAGS)" CXXFLAGS="$(CXXFLAGS)" LDFLAGS="$(LDFLAGS)"
@@ -61,6 +81,7 @@ $(B)/config: FORCE
 	@mkdir -p "$(B)"
 	@set -e; { $(foreach key,ARCH T TOOLCHAIN CC CXX AR RANLIB CFLAGS CXXFLAGS LDFLAGS PACKAGES CCACHE_LAUNCHER,printf '%s\n' '$(key)=$($(key))';) \
 		sha256sum GNUmakefile "$(R)/settings.cmake" "$(CHECKSUMS)" "$(TOOLCHAIN)/bin/$(ARCH)-gcc"; \
+		$(foreach patch,$(ZMQ_PATCHES),sha256sum "$(patch)";) \
 		if test "$(TOOLCHAIN)" = "$(R)/dyne/gcc-musl" && test -f "$(R)/build/toolchain/$(ARCH)/config"; then \
 			sha256sum "$(R)/build/toolchain/$(ARCH)/config"; \
 		fi; \
@@ -96,6 +117,9 @@ $(T)/lib/libz.a: $(B)/$(ZLIB)/.extracted
 		-DWITH_SANITIZER=OFF -DWITH_GTEST=OFF -DBUILD_SHARED_LIBS=OFF
 	$(CACHE_ENV) cmake --build "$(B)/$(ZLIB)/build" --parallel $(JOBS)
 	$(CACHE_ENV) cmake --install "$(B)/$(ZLIB)/build"
+	sed -i -e 's|^prefix=.*|prefix=$${pcfiledir}/../..|' \
+		-e 's|^exec_prefix=.*|exec_prefix=$${prefix}|' -e 's|^libdir=.*|libdir=$${prefix}/lib|' \
+		-e 's|^includedir=.*|includedir=$${prefix}/include|' "$(T)/lib/pkgconfig/zlib.pc"
 
 $(T)/lib/libssh2.a: $(B)/$(SSH2)/.extracted $(T)/lib/libssl.a $(T)/lib/libcrypto.a $(T)/lib/libz.a
 	$(CACHE_ENV) cmake -S "$(B)/$(SSH2)" -B "$(B)/$(SSH2)/build" $(CMAKE_FLAGS) \
@@ -137,6 +161,105 @@ $(T)/bin/ccache: $(B)/$(CCACHE)/.extracted
 		-DHTTP_STORAGE_BACKEND=OFF -DENABLE_TESTING=OFF -DREDIS_STORAGE_BACKEND=OFF -DSTATIC_LINK=ON
 	$(CACHE_ENV) cmake --build "$(B)/$(CCACHE)/build" --parallel $(JOBS)
 	$(CACHE_ENV) cmake --install "$(B)/$(CCACHE)/build"
+
+# Upstream's Bitcoin-compatible header-only profile supplies relocatable CMake
+# packages. Also install the complete header tree, without compiled Boost libs.
+$(BOOST_OUTPUTS) &: $(B)/$(BOOST)/.extracted
+	$(CACHE_ENV) cmake -S "$(B)/$(BOOST)" -B "$(B)/$(BOOST)/build" $(CMAKE_FLAGS) \
+		-DCMAKE_INSTALL_LIBDIR=lib -DBOOST_INCLUDE_LIBRARIES="multi_index;test" \
+		-DBOOST_TEST_HEADERS_ONLY=ON -DBOOST_ENABLE_MPI=OFF -DBOOST_ENABLE_PYTHON=OFF \
+		-DBOOST_INSTALL_LAYOUT=system -DBUILD_TESTING=OFF -DCMAKE_DISABLE_FIND_PACKAGE_ICU=ON
+	$(CACHE_ENV) cmake --install "$(B)/$(BOOST)/build"
+	@set -e; for headers in "$(B)/$(BOOST)"/libs/*/include "$(B)/$(BOOST)"/libs/numeric/*/include; do \
+		if test -d "$$headers"; then cp -R "$$headers/." "$(T)/include/"; fi; \
+	done
+	mkdir -p "$(T)/share/licenses/boost"
+	cp "$(B)/$(BOOST)/LICENSE_1_0.txt" "$(T)/share/licenses/boost/"
+
+$(SQLITE_OUTPUTS) &: $(B)/$(SQLITE)/.extracted
+	cd "$(B)/$(SQLITE)" && $(AUTOCONF_ENV) CC_FOR_BUILD=gcc \
+		CFLAGS="$(CFLAGS) -fPIC -DSQLITE_DQS=0 -DSQLITE_DEFAULT_MEMSTATUS=0" \
+		./configure --prefix="$(T)" --libdir="$(T)/lib" --build=x86_64-linux-musl --host=$(ARCH) \
+		--disable-shared --disable-readline --disable-load-extension
+	$(CACHE_ENV) $(MAKE) -C "$(B)/$(SQLITE)" -j$(JOBS) libsqlite3.a
+	$(CACHE_ENV) $(MAKE) -C "$(B)/$(SQLITE)" install-lib install-headers install-pc
+	sed -i -e 's|^prefix=.*|prefix=$${pcfiledir}/../..|' \
+		-e 's|^exec_prefix=.*|exec_prefix=$${prefix}|' -e 's|^libdir=.*|libdir=$${prefix}/lib|' \
+		-e 's|^includedir=.*|includedir=$${prefix}/include|' "$(T)/lib/pkgconfig/sqlite3.pc"
+
+# GCC's host GMP is separate: applications need an ARCH-targeted copy.
+$(GMP_OUTPUTS) &: $(B)/$(GMP)/.extracted
+	cd "$(B)/$(GMP)" && $(AUTOCONF_ENV) CFLAGS="$(CFLAGS) -std=gnu17" ./configure --prefix="$(T)" --libdir="$(T)/lib" \
+		--build=x86_64-linux-musl --host=$(ARCH) --disable-shared --enable-static --with-pic
+	$(CACHE_ENV) $(MAKE) -C "$(B)/$(GMP)" -j$(JOBS)
+	$(CACHE_ENV) $(MAKE) -C "$(B)/$(GMP)" install
+	sed -i -e 's|^prefix=.*|prefix=$${pcfiledir}/../..|' \
+		-e 's|^exec_prefix=.*|exec_prefix=$${prefix}|' -e 's|^libdir=.*|libdir=$${prefix}/lib|' \
+		-e 's|^includedir=.*|includedir=$${prefix}/include|' "$(T)/lib/pkgconfig/gmp.pc"
+	mkdir -p "$(T)/share/licenses/gmp"
+	cp "$(B)/$(GMP)"/COPYING* "$(T)/share/licenses/gmp/"
+
+# Nettle 3 is the supported API used by GnuTLS 3.8 (Nettle 4 changes it).
+$(NETTLE_OUTPUTS) &: $(B)/$(NETTLE)/.extracted $(GMP_OUTPUTS)
+	cd "$(B)/$(NETTLE)" && $(AUTOCONF_ENV) CPPFLAGS="-I$(T)/include" \
+		LDFLAGS="$(LDFLAGS) -L$(T)/lib" ./configure --prefix="$(T)" --libdir="$(T)/lib" \
+		--build=x86_64-linux-musl --host=$(ARCH) --disable-shared --enable-static --enable-pic --disable-documentation
+	$(CACHE_ENV) $(MAKE) -C "$(B)/$(NETTLE)" -j$(JOBS) libnettle.a libhogweed.a
+	$(CACHE_ENV) $(MAKE) -C "$(B)/$(NETTLE)" install-static install-headers install-pkgconfig
+	sed -i -e 's|^prefix=.*|prefix=$${pcfiledir}/../..|' \
+		-e 's|^exec_prefix=.*|exec_prefix=$${prefix}|' -e 's|^libdir=.*|libdir=$${prefix}/lib|' \
+		-e 's|^includedir=.*|includedir=$${prefix}/include|' "$(T)/lib/pkgconfig/nettle.pc" "$(T)/lib/pkgconfig/hogweed.pc"
+	mkdir -p "$(T)/share/licenses/nettle"
+	cp "$(B)/$(NETTLE)"/COPYING* "$(T)/share/licenses/nettle/"
+
+$(GNUTLS_OUTPUTS) &: $(B)/$(GNUTLS)/.extracted $(NETTLE_OUTPUTS) $(GMP_OUTPUTS) $(T)/lib/libz.a
+	cd "$(B)/$(GNUTLS)" && $(AUTOCONF_ENV) CPPFLAGS="-I$(T)/include" \
+		LDFLAGS="$(LDFLAGS) -L$(T)/lib" PKG_CONFIG="pkg-config --static" \
+		./configure --prefix="$(T)" --libdir="$(T)/lib" --build=x86_64-linux-musl --host=$(ARCH) \
+		--disable-shared --enable-static --with-pic --disable-doc --disable-tools --disable-tests \
+		--disable-cxx --disable-nls --disable-libdane --without-idn --without-p11-kit --without-tpm --without-tpm2 \
+		--with-included-libtasn1 --with-included-unistring --with-zlib=link --without-brotli --without-zstd \
+		--with-default-trust-store-file=/etc/ssl/certs/ca-certificates.crt
+	$(CACHE_ENV) $(MAKE) -C "$(B)/$(GNUTLS)" -j$(JOBS)
+	$(CACHE_ENV) $(MAKE) -C "$(B)/$(GNUTLS)" install
+	sed -i -e 's|^prefix=.*|prefix=$${pcfiledir}/../..|' \
+		-e 's|^exec_prefix=.*|exec_prefix=$${prefix}|' -e 's|^libdir=.*|libdir=$${prefix}/lib|' \
+		-e 's|^includedir=.*|includedir=$${prefix}/include|' "$(T)/lib/pkgconfig/gnutls.pc"
+	mkdir -p "$(T)/share/licenses/gnutls"
+	cp "$(B)/$(GNUTLS)"/COPYING* "$(T)/share/licenses/gnutls/"
+
+$(SODIUM_OUTPUTS) &: $(B)/$(SODIUM)/.extracted
+	cd "$(B)/$(SODIUM)" && $(AUTOCONF_ENV) CFLAGS="$(CFLAGS) -fPIC" \
+		./configure --prefix="$(T)" --libdir="$(T)/lib" --build=x86_64-linux-musl --host=$(ARCH) \
+		--disable-shared --enable-static --with-pic
+	$(CACHE_ENV) $(MAKE) -C "$(B)/$(SODIUM)" -j$(JOBS)
+	$(CACHE_ENV) $(MAKE) -C "$(B)/$(SODIUM)" install
+	sed -i -e 's|^prefix=.*|prefix=$${pcfiledir}/../..|' \
+		-e 's|^exec_prefix=.*|exec_prefix=$${prefix}|' -e 's|^libdir=.*|libdir=$${prefix}/lib|' \
+		-e 's|^includedir=.*|includedir=$${prefix}/include|' "$(T)/lib/pkgconfig/libsodium.pc"
+	mkdir -p "$(T)/share/licenses/libsodium"
+	cp "$(B)/$(SODIUM)/LICENSE" "$(T)/share/licenses/libsodium/"
+
+$(B)/$(ZMQ)/.patched: $(B)/$(ZMQ)/.extracted $(ZMQ_PATCHES)
+	@set -e; for source_patch in $(ZMQ_PATCHES); do \
+		patch --fuzz=0 -d "$(B)/$(ZMQ)" -p1 < "$$source_patch"; \
+	done
+	touch "$@"
+
+$(ZMQ_OUTPUTS) &: $(B)/$(ZMQ)/.patched $(GNUTLS_OUTPUTS) $(SODIUM_OUTPUTS)
+	$(CACHE_ENV) cmake -S "$(B)/$(ZMQ)" -B "$(B)/$(ZMQ)/build" $(CMAKE_FLAGS) \
+		-DCMAKE_INSTALL_LIBDIR=lib -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+		-DBUILD_SHARED=OFF -DBUILD_STATIC=ON -DBUILD_TESTS=OFF -DZMQ_BUILD_TESTS=OFF \
+		-DWITH_DOCS=OFF -DENABLE_CPACK=OFF -DENABLE_DRAFTS=ON -DENABLE_CURVE=ON \
+		-DWITH_LIBSODIUM=ON -DWITH_LIBSODIUM_STATIC=ON -DWITH_LIBBSD=OFF -DWITH_OPENPGM=OFF -DWITH_NORM=OFF \
+		-DENABLE_WS=ON -DWITH_TLS=ON -DWITH_NSS=OFF
+	$(CACHE_ENV) cmake --build "$(B)/$(ZMQ)/build" --parallel $(JOBS)
+	$(CACHE_ENV) cmake --install "$(B)/$(ZMQ)/build"
+	sed -i -e 's|^prefix=.*|prefix=$${pcfiledir}/../..|' \
+		-e 's|^exec_prefix=.*|exec_prefix=$${prefix}|' -e 's|^libdir=.*|libdir=$${prefix}/lib|' \
+		-e 's|^includedir=.*|includedir=$${prefix}/include|' "$(T)/lib/pkgconfig/libzmq.pc"
+	mkdir -p "$(T)/share/licenses/zeromq"
+	cp "$(B)/$(ZMQ)/LICENSE" "$(T)/share/licenses/zeromq/"
 
 clean:
 	rm -rf "$(B)" "$(T)"

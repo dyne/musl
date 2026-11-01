@@ -73,7 +73,15 @@ The source configuration includes `binutils-2.47.tar.xz`, `gcc-16.2.0.tar.xz`, `
 
 Additional base libraries and utilities are `libressl-4.4.0`, `zlib-ng-2.3.3`, `curl-8.23.0`, `libssh2-1.11.1`, `ccache-4.14.2`, `ncurses-6.6` (wide-character static library), and `kyotocabinet-1.2.80`.
 
-Versions were checked against upstream stable releases on 2026-10-31. Published
+The SDK also includes Boost **1.92.0** headers, SQLite **3.54.1**, ZeroMQ
+**4.3.5**, libsodium **1.0.22**, GnuTLS **3.8.13**, target GMP **6.3.0** and
+Nettle/hogweed **3.10.2**. ZeroMQ includes CURVE encryption and secure WebSockets
+through libsodium and GnuTLS; WebSockets use ZeroMQ's draft API. See
+[Bitcoin Core and secure ZeroMQ](bitcoin.md) for configuration, limitations and
+package-update instructions.
+
+Versions were checked against upstream releases on 2026-11-01, with Nettle 3
+pinned for GnuTLS API compatibility. Published
 archives may lag the source configuration until release validation completes.
 
 Downloads, including cached archives, are checked against the pinned

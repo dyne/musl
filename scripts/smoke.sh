@@ -13,7 +13,7 @@ target=${TARGET_PREFIX:-$PWD/dyne/$arch}
 build=${SMOKE_BUILD_DIR:-$PWD/build/smoke/$arch}
 readelf=$compiler/bin/$arch-readelf
 mkdir -p "$build"
-for library in ssl crypto z curl ssh2 ncursesw kyotocabinet; do
+for library in ssl crypto z curl ssh2 ncursesw kyotocabinet sqlite3 gmp nettle hogweed gnutls sodium zmq; do
     test -s "$target/lib/lib$library.a"
 done
 test -x "$target/bin/ccache"
@@ -24,8 +24,12 @@ test -x "$target/bin/ccache"
     -L"$target/lib" -lcurl -lssh2 -lssl -lcrypto -lz -lncursesw -lpthread -o "$build/c"
 "$compiler/bin/$arch-g++" -static -Os -std=c++20 -I"$target/include" tests/smoke.cpp \
     -L"$target/lib" -lkyotocabinet -latomic -lpthread -o "$build/cpp"
+cmake -S tests/dependencies -B "$build/dependencies" \
+    -DCMAKE_TOOLCHAIN_FILE="$PWD/settings.cmake" -DARCH="$arch" \
+    -DTOOLCHAIN_PREFIX="$compiler" -DTARGET_PREFIX="$target" -DCCACHE=OFF -DFORCE_STATIC=ON
+cmake --build "$build/dependencies" --parallel 2
 for binary in "$build/toolchain" "$build/static-pie" "$build/static-and-pie" \
-    "$build/c" "$build/cpp" "$target/bin/ccache"; do
+    "$build/c" "$build/cpp" "$build/dependencies/dependencies" "$build/dependencies/pkgconfig" "$target/bin/ccache"; do
     headers=$("$readelf" -h -l -d "$binary")
     grep -q "$machine" <<< "$headers"
     if grep -Eq 'INTERP|NEEDED' <<< "$headers"; then
@@ -42,6 +46,8 @@ if [[ $arch == x86_64-linux-musl && $(uname -m) == x86_64 ]]; then
     "$build/static-and-pie"
     "$build/c"
     "$build/cpp"
+    "$build/dependencies/dependencies"
+    "$build/dependencies/pkgconfig"
     "$target/bin/ccache" --version
     echo "Native libc/static-PIE, C, C++20/thread/database and ccache smoke tests passed"
 else
