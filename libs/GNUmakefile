@@ -40,12 +40,22 @@ GMP ?= gmp-6.3.0
 NETTLE ?= nettle-3.10.2
 GNUTLS ?= gnutls-3.8.13
 SODIUM ?= libsodium-1.0.22
+SDL ?= SDL3-3.4.18
+SDLIMAGE ?= SDL3_image-3.4.8
+SDLTTF ?= SDL3_ttf-3.2.2
+FREETYPE ?= freetype-2.15.0
+HARFBUZZ ?= harfbuzz-15.0.0
+IMGUI ?= imgui-1.93.0
 BOOST_VERSION := $(patsubst boost-%,%,$(BOOST))
 ZMQ_PATCHES := $(sort $(wildcard patches/$(ZMQ)/*.patch))
+HARFBUZZ_PATCHES := $(sort $(wildcard patches/$(HARFBUZZ)/*.patch))
+LIBRARY_PATCHES := $(ZMQ_PATCHES) $(HARFBUZZ_PATCHES)
+PACKAGE_CMAKE := $(sort $(wildcard cmake/*.cmake cmake/imgui/*))
 
-PACKAGES := $(LIBSSL) $(ZLIB) $(CURL) $(SSH2) $(CCACHE) $(NCURSES) $(KYOTOCAB) $(BOOST) $(SQLITE) $(GMP) $(NETTLE) $(GNUTLS) $(SODIUM) $(ZMQ)
+PACKAGES := $(LIBSSL) $(ZLIB) $(CURL) $(SSH2) $(CCACHE) $(NCURSES) $(KYOTOCAB) $(BOOST) $(SQLITE) $(GMP) $(NETTLE) $(GNUTLS) $(SODIUM) $(ZMQ) $(SDL) $(SDLIMAGE) $(SDLTTF) $(FREETYPE) $(HARFBUZZ) $(IMGUI)
 ARCHIVES := $(LIBSSL).tar.gz $(ZLIB).tar.gz $(CURL).tar.xz $(SSH2).tar.xz $(CCACHE).tar.xz $(NCURSES).tar.gz $(KYOTOCAB).tar.gz \
-	$(BOOST).tar.xz $(SQLITE).tar.gz $(GMP).tar.xz $(NETTLE).tar.gz $(GNUTLS).tar.xz $(SODIUM).tar.gz $(ZMQ).tar.gz
+	$(BOOST).tar.xz $(SQLITE).tar.gz $(GMP).tar.xz $(NETTLE).tar.gz $(GNUTLS).tar.xz $(SODIUM).tar.gz $(ZMQ).tar.gz \
+	$(SDL).tar.gz $(SDLIMAGE).tar.gz $(SDLTTF).tar.gz $(FREETYPE).tar.xz $(HARFBUZZ).tar.xz $(IMGUI).tar.gz
 BOOST_OUTPUTS := $(T)/include/boost/version.hpp $(T)/include/boost/multi_index_container.hpp \
 	$(T)/lib/cmake/Boost-$(BOOST_VERSION)/BoostConfig.cmake
 SQLITE_OUTPUTS := $(T)/lib/libsqlite3.a $(T)/include/sqlite3.h $(T)/lib/pkgconfig/sqlite3.pc
@@ -56,9 +66,24 @@ NETTLE_OUTPUTS := $(T)/lib/libnettle.a $(T)/lib/libhogweed.a $(T)/include/nettle
 	$(T)/lib/pkgconfig/nettle.pc $(T)/lib/pkgconfig/hogweed.pc
 GNUTLS_OUTPUTS := $(T)/lib/libgnutls.a $(T)/include/gnutls/gnutls.h $(T)/lib/pkgconfig/gnutls.pc
 SODIUM_OUTPUTS := $(T)/lib/libsodium.a $(T)/include/sodium.h $(T)/lib/pkgconfig/libsodium.pc
+SDL_OUTPUTS := $(T)/lib/libSDL3.a $(T)/include/SDL3/SDL.h $(T)/lib/pkgconfig/sdl3.pc \
+	$(T)/lib/cmake/SDL3/SDL3Config.cmake
+SDLIMAGE_OUTPUTS := $(T)/lib/libSDL3_image.a $(T)/include/SDL3_image/SDL_image.h \
+	$(T)/lib/pkgconfig/sdl3-image.pc $(T)/lib/cmake/SDL3_image/SDL3_imageConfig.cmake
+SDLTTF_OUTPUTS := $(T)/lib/libSDL3_ttf.a $(T)/include/SDL3_ttf/SDL_ttf.h \
+	$(T)/lib/pkgconfig/sdl3-ttf.pc $(T)/lib/cmake/SDL3_ttf/SDL3_ttfConfig.cmake
+FREETYPE_OUTPUTS := $(T)/lib/libfreetype.a $(T)/include/freetype2/ft2build.h \
+	$(T)/lib/pkgconfig/freetype2.pc
+HARFBUZZ_OUTPUTS := $(T)/lib/libharfbuzz.a $(T)/include/harfbuzz/hb.h \
+	$(T)/lib/pkgconfig/harfbuzz.pc $(T)/lib/cmake/harfbuzz/harfbuzzConfig.cmake \
+	$(T)/lib/cmake/harfbuzz/harfbuzz-targets.cmake
+IMGUI_OUTPUTS := $(T)/lib/libimgui.a $(T)/include/imgui/imgui.h \
+	$(T)/include/imgui/backends/imgui_impl_sdl3.h $(T)/include/imgui/backends/imgui_impl_sdlrenderer3.h \
+	$(T)/lib/pkgconfig/imgui.pc $(T)/lib/cmake/imgui/imguiConfig.cmake $(T)/lib/cmake/imgui/imguiTargets.cmake
 OUTPUTS := $(T)/lib/libssl.a $(T)/lib/libcrypto.a $(T)/lib/libz.a \
 	$(T)/lib/libcurl.a $(T)/lib/libssh2.a $(T)/lib/libncursesw.a \
-	$(T)/lib/libkyotocabinet.a $(T)/bin/ccache $(BOOST_OUTPUTS) $(SQLITE_OUTPUTS) $(GMP_OUTPUTS) $(NETTLE_OUTPUTS) $(GNUTLS_OUTPUTS) $(SODIUM_OUTPUTS) $(ZMQ_OUTPUTS)
+	$(T)/lib/libkyotocabinet.a $(T)/bin/ccache $(BOOST_OUTPUTS) $(SQLITE_OUTPUTS) $(GMP_OUTPUTS) $(NETTLE_OUTPUTS) $(GNUTLS_OUTPUTS) $(SODIUM_OUTPUTS) $(ZMQ_OUTPUTS) \
+	$(SDL_OUTPUTS) $(SDLIMAGE_OUTPUTS) $(SDLTTF_OUTPUTS) $(FREETYPE_OUTPUTS) $(HARFBUZZ_OUTPUTS) $(IMGUI_OUTPUTS)
 CACHE_ENV = sh "$(R)/scripts/compiler-cache.sh" "$(CCACHE_LAUNCHER)" "$(TOOLCHAIN)/bin/$(ARCH)-gcc"
 AUTOCONF_ENV = $(CACHE_ENV) env CC="$(CC)" CXX="$(CXX)" AR="$(AR)" RANLIB="$(RANLIB)" \
 	CFLAGS="$(CFLAGS)" CXXFLAGS="$(CXXFLAGS)" LDFLAGS="$(LDFLAGS)"
@@ -81,7 +106,7 @@ $(B)/config: FORCE
 	@mkdir -p "$(B)"
 	@set -e; { $(foreach key,ARCH T TOOLCHAIN CC CXX AR RANLIB CFLAGS CXXFLAGS LDFLAGS PACKAGES CCACHE_LAUNCHER,printf '%s\n' '$(key)=$($(key))';) \
 		sha256sum GNUmakefile "$(R)/settings.cmake" "$(CHECKSUMS)" "$(TOOLCHAIN)/bin/$(ARCH)-gcc"; \
-		$(foreach patch,$(ZMQ_PATCHES),sha256sum "$(patch)";) \
+		$(foreach input,$(LIBRARY_PATCHES) $(PACKAGE_CMAKE),sha256sum "$(input)";) \
 		if test "$(TOOLCHAIN)" = "$(R)/dyne/gcc-musl" && test -f "$(R)/build/toolchain/$(ARCH)/config"; then \
 			sha256sum "$(R)/build/toolchain/$(ARCH)/config"; \
 		fi; \
@@ -260,6 +285,90 @@ $(ZMQ_OUTPUTS) &: $(B)/$(ZMQ)/.patched $(GNUTLS_OUTPUTS) $(SODIUM_OUTPUTS)
 		-e 's|^includedir=.*|includedir=$${prefix}/include|' "$(T)/lib/pkgconfig/libzmq.pc"
 	mkdir -p "$(T)/share/licenses/zeromq"
 	cp "$(B)/$(ZMQ)/LICENSE" "$(T)/share/licenses/zeromq/"
+
+# Headless profile: deterministic software rendering with no display/audio
+# service dependencies and no runtime dlopen in fully static musl applications.
+$(SDL_OUTPUTS) &: $(B)/$(SDL)/.extracted
+	$(CACHE_ENV) cmake -S "$(B)/$(SDL)" -B "$(B)/$(SDL)/build" $(CMAKE_FLAGS) \
+		-DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_LIBDIR=lib -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+		-DSDL_SHARED=OFF -DSDL_STATIC=ON -DSDL_RELOCATABLE=ON -DSDL_DEPS_SHARED=OFF \
+		-DSDL_TESTS=OFF -DSDL_TEST_LIBRARY=OFF -DSDL_EXAMPLES=OFF -DSDL_INSTALL_CPACK=OFF \
+		-DSDL_UNIX_CONSOLE_BUILD=ON -DSDL_X11=OFF -DSDL_WAYLAND=OFF -DSDL_KMSDRM=OFF -DSDL_OPENGL=OFF -DSDL_OPENGLES=OFF \
+		-DSDL_VULKAN=OFF -DSDL_GPU=OFF -DSDL_OFFSCREEN=ON -DSDL_DUMMYVIDEO=ON \
+		-DSDL_ALSA=OFF -DSDL_JACK=OFF -DSDL_PIPEWIRE=OFF -DSDL_PULSEAUDIO=OFF -DSDL_SNDIO=OFF -DSDL_OSS=OFF \
+		-DSDL_DBUS=OFF -DSDL_IBUS=OFF -DSDL_LIBUDEV=OFF -DSDL_LIBURING=OFF -DSDL_HIDAPI=OFF \
+		-DSDL_CAMERA=OFF -DSDL_DIALOG=OFF -DSDL_LOADSO=OFF -DSDL_RPI=OFF -DSDL_ROCKCHIP=OFF -DSDL_VIVANTE=OFF
+	$(CACHE_ENV) cmake --build "$(B)/$(SDL)/build" --parallel $(JOBS)
+	$(CACHE_ENV) cmake --install "$(B)/$(SDL)/build"
+	mkdir -p "$(T)/share/licenses/SDL3"
+	cp "$(B)/$(SDL)/LICENSE.txt" "$(T)/share/licenses/SDL3/"
+
+$(SDLIMAGE_OUTPUTS) &: $(B)/$(SDLIMAGE)/.extracted $(SDL_OUTPUTS)
+	$(CACHE_ENV) cmake -S "$(B)/$(SDLIMAGE)" -B "$(B)/$(SDLIMAGE)/build" $(CMAKE_FLAGS) \
+		-DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_LIBDIR=lib -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DBUILD_SHARED_LIBS=OFF \
+		-DSDLIMAGE_VENDORED=OFF -DSDLIMAGE_DEPS_SHARED=OFF -DSDLIMAGE_RELOCATABLE=ON \
+		-DSDLIMAGE_BACKEND_STB=ON -DSDLIMAGE_PNG_LIBPNG=OFF -DSDLIMAGE_AVIF=OFF \
+		-DSDLIMAGE_JXL=OFF -DSDLIMAGE_TIF=OFF -DSDLIMAGE_WEBP=OFF \
+		-DSDLIMAGE_SAMPLES=OFF -DSDLIMAGE_TESTS=OFF -DSDLIMAGE_INSTALL_CPACK=OFF
+	$(CACHE_ENV) cmake --build "$(B)/$(SDLIMAGE)/build" --parallel $(JOBS)
+	$(CACHE_ENV) cmake --install "$(B)/$(SDLIMAGE)/build"
+	mkdir -p "$(T)/share/licenses/SDL3_image"
+	cp "$(B)/$(SDLIMAGE)/LICENSE.txt" "$(T)/share/licenses/SDL3_image/"
+	# Preserve notices belonging to the compiled-in image codecs.
+	cp $(addprefix "$(B)/$(SDLIMAGE)/src/",stb_image.h nanosvg.h nanosvgrast.h) "$(T)/share/licenses/SDL3_image/"
+
+# HarfBuzz uses FreeType's rasterizer; disable FreeType's reverse dependency to
+# keep an acyclic static dependency graph. Reuse our target zlib for .gz fonts.
+$(FREETYPE_OUTPUTS) &: $(B)/$(FREETYPE)/.extracted $(T)/lib/libz.a
+	$(CACHE_ENV) cmake -S "$(B)/$(FREETYPE)" -B "$(B)/$(FREETYPE)/build" $(CMAKE_FLAGS) \
+		-DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_LIBDIR=lib -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DBUILD_SHARED_LIBS=OFF \
+		-DFT_REQUIRE_ZLIB=ON -DFT_DISABLE_BZIP2=ON -DFT_DISABLE_PNG=ON \
+		-DFT_DISABLE_HARFBUZZ=ON -DFT_DISABLE_BROTLI=ON
+	$(CACHE_ENV) cmake --build "$(B)/$(FREETYPE)/build" --parallel $(JOBS)
+	$(CACHE_ENV) cmake --install "$(B)/$(FREETYPE)/build"
+	sed -i -e 's|^prefix=.*|prefix=$${pcfiledir}/../..|' "$(T)/lib/pkgconfig/freetype2.pc"
+	mkdir -p "$(T)/share/licenses/freetype"
+	cp "$(B)/$(FREETYPE)/LICENSE.TXT" "$(B)/$(FREETYPE)/docs/FTL.TXT" "$(B)/$(FREETYPE)/docs/GPLv2.TXT" "$(T)/share/licenses/freetype/"
+
+$(B)/$(HARFBUZZ)/.patched: $(B)/$(HARFBUZZ)/.extracted $(HARFBUZZ_PATCHES)
+	@set -e; for source_patch in $(HARFBUZZ_PATCHES); do \
+		patch --fuzz=0 -d "$(B)/$(HARFBUZZ)" -p1 < "$$source_patch"; \
+	done
+	touch "$@"
+
+$(HARFBUZZ_OUTPUTS) &: $(B)/$(HARFBUZZ)/.patched $(FREETYPE_OUTPUTS)
+	$(CACHE_ENV) cmake -S "$(B)/$(HARFBUZZ)" -B "$(B)/$(HARFBUZZ)/build" $(CMAKE_FLAGS) \
+		-DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_LIBDIR=lib -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DBUILD_SHARED_LIBS=OFF \
+		-DHB_HAVE_FREETYPE=ON -DHB_HAVE_CAIRO=OFF -DHB_HAVE_GLIB=OFF -DHB_HAVE_ICU=OFF -DHB_HAVE_GRAPHITE2=OFF \
+		-DHB_BUILD_UTILS=OFF -DHB_BUILD_SUBSET=OFF -DHB_BUILD_RASTER=OFF -DHB_BUILD_VECTOR=OFF -DHB_BUILD_GPU=OFF \
+		-DHB_BUILD_GPU_DEMO=OFF -DBUILD_TESTING=OFF
+	$(CACHE_ENV) cmake --build "$(B)/$(HARFBUZZ)/build" --parallel $(JOBS)
+	$(CACHE_ENV) cmake --install "$(B)/$(HARFBUZZ)/build"
+	mv "$(T)/lib/cmake/harfbuzz/harfbuzzConfig.cmake" "$(T)/lib/cmake/harfbuzz/harfbuzz-targets.cmake"
+	cp cmake/harfbuzzConfig.cmake "$(T)/lib/cmake/harfbuzz/harfbuzzConfig.cmake"
+	sed -i -e 's|^prefix=.*|prefix=$${pcfiledir}/../..|' \
+		-e '/^Libs.private:/s/$$/ -lstdc++/' "$(T)/lib/pkgconfig/harfbuzz.pc"
+	mkdir -p "$(T)/share/licenses/harfbuzz"
+	cp "$(B)/$(HARFBUZZ)/COPYING" "$(T)/share/licenses/harfbuzz/"
+
+$(SDLTTF_OUTPUTS) &: $(B)/$(SDLTTF)/.extracted $(SDL_OUTPUTS) $(FREETYPE_OUTPUTS) $(HARFBUZZ_OUTPUTS)
+	$(CACHE_ENV) cmake -S "$(B)/$(SDLTTF)" -B "$(B)/$(SDLTTF)/build" $(CMAKE_FLAGS) \
+		-DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_LIBDIR=lib -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DBUILD_SHARED_LIBS=OFF \
+		-DSDLTTF_VENDORED=OFF -DSDLTTF_HARFBUZZ=ON -DSDLTTF_PLUTOSVG=OFF \
+		-DSDLTTF_RELOCATABLE=ON -DSDLTTF_SAMPLES=OFF -DSDLTTF_INSTALL_CPACK=OFF
+	$(CACHE_ENV) cmake --build "$(B)/$(SDLTTF)/build" --parallel $(JOBS)
+	$(CACHE_ENV) cmake --install "$(B)/$(SDLTTF)/build"
+	mkdir -p "$(T)/share/licenses/SDL3_ttf"
+	cp "$(B)/$(SDLTTF)/LICENSE.txt" "$(T)/share/licenses/SDL3_ttf/"
+
+# Upstream intentionally ships source files rather than a CMake package.
+# Bundle only the SDL3 platform/SDL_Renderer3 backends; fonts use bundled stb.
+$(IMGUI_OUTPUTS) &: $(B)/$(IMGUI)/.extracted $(SDL_OUTPUTS)
+	$(CACHE_ENV) cmake -S cmake/imgui -B "$(B)/$(IMGUI)/build" $(CMAKE_FLAGS) \
+		-DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_LIBDIR=lib -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+		-DIMGUI_SOURCE_DIR="$(B)/$(IMGUI)" -DIMGUI_VERSION="$(patsubst imgui-%,%,$(IMGUI))"
+	$(CACHE_ENV) cmake --build "$(B)/$(IMGUI)/build" --parallel $(JOBS)
+	$(CACHE_ENV) cmake --install "$(B)/$(IMGUI)/build"
 
 clean:
 	rm -rf "$(B)" "$(T)"

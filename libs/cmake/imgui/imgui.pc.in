@@ -1,0 +1,11 @@
+prefix=${pcfiledir}/../..
+libdir=${prefix}/@CMAKE_INSTALL_LIBDIR@
+includedir=${prefix}/@CMAKE_INSTALL_INCLUDEDIR@
+
+Name: imgui
+Description: Dear ImGui with SDL3 platform and SDL_Renderer3 backends
+Version: @PROJECT_VERSION@
+Requires: sdl3 >= 3.4
+Libs: -L${libdir} -limgui
+Libs.private: -lstdc++ -lm
+Cflags: -I${includedir}/imgui -I${includedir}/imgui/backends

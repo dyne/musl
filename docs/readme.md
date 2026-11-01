@@ -80,6 +80,17 @@ through libsodium and GnuTLS; WebSockets use ZeroMQ's draft API. See
 [Bitcoin Core and secure ZeroMQ](bitcoin.md) for configuration, limitations and
 package-update instructions.
 
+The SDK supplies [avena's dependencies](avena.md): C++17, threads, libatomic
+and the OpenSSL-compatible static SSL/crypto libraries from LibreSSL. Avena's
+core and WebSocket modules need no additional third-party packages.
+
+[Headless SDL3 graphics](sdl3.md) includes SDL **3.4.18**, SDL_image **3.4.8**,
+SDL_ttf **3.2.2**, FreeType **2.15.0** and HarfBuzz **15.0.0** for offscreen
+software rendering, image loading and international text. Desktop windows,
+GPU rendering and hardware audio backends are outside this profile.
+[Dear ImGui 1.93.0](imgui.md) adds widgets and font-atlas rendering through
+SDL3's software renderer, with no additional external libraries.
+
 Versions were checked against upstream releases on 2026-11-01, with Nettle 3
 pinned for GnuTLS API compatibility. Published
 archives may lag the source configuration until release validation completes.

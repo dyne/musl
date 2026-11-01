@@ -144,6 +144,23 @@ isolates pkg-config from host libraries. `libs/patches/README.md` records the
 GCC/CMake/musl/crypto export patches; patch hashes invalidate library state.
 Boost installs all headers with CMake metadata for Bitcoin's header-only
 multi_index/test closure; compiled Boost libraries are absent.
+Avena's C++17/thread/atomic and OpenSSL-compatible TLS dependencies are already
+bundled; see `docs/avena.md`. Its tests need host OpenSSL (set
+AVENA_OPENSSL_EXECUTABLE explicitly), not the target LibreSSL CLI.
+SDL 3.4.18, SDL_image 3.4.8, SDL_ttf 3.2.2, FreeType 2.15.0 and HarfBuzz 15.0.0
+provide the headless/offscreen software-rendering profile in `docs/sdl3.md`.
+No desktop/GPU/hardware-audio backend is included. Image codecs are built in;
+FreeType uses target zlib but disables its reverse HarfBuzz dependency.
+HarfBuzz's FreeType/zlib CMake closure is patched and restored by
+`libs/cmake/harfbuzzConfig.cmake`; patch/helper hashes invalidate library state.
+SDL smoke tests use an original generated test font, including an Arabic GSUB
+ligature, and validate both CMake and pure-C pkg-config static-PIE consumers.
+Dear ImGui 1.93.0 bundles SDL3 platform/SDL_Renderer3 backends in libimgui.a,
+with CMake target `imgui::imgui` and pkg-config name `imgui`. Its bundled stb
+font rasterizer needs no SDL_ttf/FreeType/HarfBuzz dependency. It does not
+automatically shape complex scripts. `libs/cmake/imgui/` supplies packaging
+for upstream sources and is fingerprinted. See `docs/imgui.md`; smoke consumers
+verify actual widget/font pixels through SDL's offscreen software renderer.
 LibreSSL provides OpenSSL-compatible crypto; zlib-ng uses
 zlib compatibility mode. curl explicitly depends on SSL, zlib and SSH2.
 ncurses builds its wide-character static library without host-tic-dependent
