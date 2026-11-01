@@ -13,7 +13,7 @@ target=${TARGET_PREFIX:-$PWD/dyne/$arch}
 build=${SMOKE_BUILD_DIR:-$PWD/build/smoke/$arch}
 readelf=$compiler/bin/$arch-readelf
 mkdir -p "$build"
-for library in ssl crypto z curl ssh2 ncursesw kyotocabinet sqlite3 gmp nettle hogweed gnutls sodium zmq; do
+for library in ssl crypto z curl ssh2 ncursesw kyotocabinet sqlite3 gmp nettle hogweed gnutls sodium zmq SDL3 SDL3_image SDL3_ttf freetype harfbuzz imgui; do
     test -s "$target/lib/lib$library.a"
 done
 test -x "$target/bin/ccache"
@@ -28,8 +28,18 @@ cmake -S tests/dependencies -B "$build/dependencies" \
     -DCMAKE_TOOLCHAIN_FILE="$PWD/settings.cmake" -DARCH="$arch" \
     -DTOOLCHAIN_PREFIX="$compiler" -DTARGET_PREFIX="$target" -DCCACHE=OFF -DFORCE_STATIC=ON
 cmake --build "$build/dependencies" --parallel 2
+cmake -S tests/sdl -B "$build/sdl" \
+    -DCMAKE_TOOLCHAIN_FILE="$PWD/settings.cmake" -DARCH="$arch" \
+    -DTOOLCHAIN_PREFIX="$compiler" -DTARGET_PREFIX="$target" -DCCACHE=OFF -DFORCE_STATIC=ON
+cmake --build "$build/sdl" --parallel 2
+cmake -S tests/imgui -B "$build/imgui" \
+    -DCMAKE_TOOLCHAIN_FILE="$PWD/settings.cmake" -DARCH="$arch" \
+    -DTOOLCHAIN_PREFIX="$compiler" -DTARGET_PREFIX="$target" -DCCACHE=OFF -DFORCE_STATIC=ON
+cmake --build "$build/imgui" --parallel 2
 for binary in "$build/toolchain" "$build/static-pie" "$build/static-and-pie" \
-    "$build/c" "$build/cpp" "$build/dependencies/dependencies" "$build/dependencies/pkgconfig" "$target/bin/ccache"; do
+    "$build/c" "$build/cpp" "$build/dependencies/dependencies" "$build/dependencies/pkgconfig" \
+    "$build/dependencies/avena-dependencies" "$build/sdl/sdl" "$build/sdl/sdl-pkgconfig" \
+    "$build/imgui/imgui" "$build/imgui/imgui-pkgconfig" "$target/bin/ccache"; do
     headers=$("$readelf" -h -l -d "$binary")
     grep -q "$machine" <<< "$headers"
     if grep -Eq 'INTERP|NEEDED' <<< "$headers"; then
@@ -38,7 +48,8 @@ for binary in "$build/toolchain" "$build/static-pie" "$build/static-and-pie" \
     fi
 done
 for binary in "$build/static-pie" "$build/static-and-pie" \
-    "$build/dependencies/dependencies" "$build/dependencies/pkgconfig"; do
+    "$build/dependencies/dependencies" "$build/dependencies/pkgconfig" "$build/sdl/sdl" "$build/sdl/sdl-pkgconfig" \
+    "$build/imgui/imgui" "$build/imgui/imgui-pkgconfig"; do
     "$readelf" -h "$binary" | grep -Eq 'Type:[[:space:]]+DYN'
 done
 if [[ $arch == x86_64-linux-musl && $(uname -m) == x86_64 ]]; then
@@ -49,6 +60,9 @@ if [[ $arch == x86_64-linux-musl && $(uname -m) == x86_64 ]]; then
     "$build/cpp"
     "$build/dependencies/dependencies"
     "$build/dependencies/pkgconfig"
+    "$build/dependencies/avena-dependencies"
+    ctest --test-dir "$build/sdl" --output-on-failure --parallel 1
+    ctest --test-dir "$build/imgui" --output-on-failure --parallel 1
     "$target/bin/ccache" --version
     echo "Native libc/static-PIE, C, C++20/thread/database and ccache smoke tests passed"
 else

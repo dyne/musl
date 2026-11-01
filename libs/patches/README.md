@@ -28,3 +28,12 @@ libsodium and POSIX threads. WebSockets require ENABLE_DRAFTS=ON in 4.3.5;
 applications opt into the exposed draft API. LibreSSL is not a supported ZeroMQ
 backend. Absent NSS, libbsd, OpenPGM and NORM backends are explicitly disabled.
 GnuTLS reuses existing zlib-ng through its own static dependency graph.
+
+## HarfBuzz 15.0.0
+
+`static-freetype-export.patch` replaces the absolute FreeType archive in the
+CMake export with a pkg-config imported target carrying FreeType's static zlib
+closure. `libs/cmake/harfbuzzConfig.cmake` recreates it and Threads in consumers,
+then loads the upstream export as `harfbuzz-targets.cmake`. This keeps the
+static SDK relocatable. Both the patch and package helper invalidate library
+state. Recheck the export and installed consumer when upgrading HarfBuzz.
