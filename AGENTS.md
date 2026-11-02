@@ -129,6 +129,10 @@ helper also hashes the target assembler and wraps library configure/build/instal
 generated target compiler flags or add unsafe ccache timestamp sloppiness.
 Both flavors build musl's static archive with `-fPIC` for static-PIE linkage;
 PIE applications must compile their own objects with `-fPIE` too.
+The smoke projects use `tests/cmake/RequireStaticPIE.cmake` to compile CMake's
+PIE capability probes with `-fPIE` as well. Older CMake otherwise rejects
+non-PIE ARM/RISC-V probe objects and silently omits PIE linker flags. Keep a
+failed capability probe fatal and retain the ELF DYN assertions.
 
 Bundled versions in `libs/GNUmakefile`: LibreSSL **4.4.0**, zlib-ng **2.3.3**,
 curl **8.23.0**, libssh2 **1.11.1**, ccache **4.14.2**, ncurses **6.6**, Kyoto
