@@ -46,7 +46,10 @@ for binary in "$build/toolchain" "$build/static-pie" "$build/static-and-pie" \
     "$build/curl/curl-pkgconfig" "$build/curl/curl-config" \
     "$build/imgui/imgui" "$build/imgui/imgui-pkgconfig" "$target/bin/ccache"; do
     headers=$("$readelf" -h -l -d "$binary")
-    grep -q "$machine" <<< "$headers"
+    if ! grep -q "$machine" <<< "$headers"; then
+        echo "Unexpected ELF machine for $arch: $binary" >&2
+        exit 1
+    fi
     if grep -Eq 'INTERP|NEEDED' <<< "$headers"; then
         echo "Unexpected dynamic dependency: $binary" >&2
         exit 1
@@ -55,7 +58,11 @@ done
 for binary in "$build/static-pie" "$build/static-and-pie" \
     "$build/dependencies/dependencies" "$build/dependencies/pkgconfig" "$build/sdl/sdl" "$build/sdl/sdl-pkgconfig" \
     "$build/imgui/imgui" "$build/imgui/imgui-pkgconfig"; do
-    "$readelf" -h "$binary" | grep -Eq 'Type:[[:space:]]+DYN'
+    headers=$("$readelf" -h "$binary")
+    if ! grep -Eq 'Type:[[:space:]]+DYN' <<< "$headers"; then
+        echo "Expected static PIE (ELF DYN): $binary" >&2
+        exit 1
+    fi
 done
 if [[ $arch == x86_64-linux-musl && $(uname -m) == x86_64 ]]; then
     "$build/toolchain"

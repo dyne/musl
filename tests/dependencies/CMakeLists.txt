@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.22)
 project(DyneDependencySmoke LANGUAGES C CXX)
-include(CheckPIESupported)
-check_pie_supported()
+include("${CMAKE_CURRENT_LIST_DIR}/../cmake/RequireStaticPIE.cmake")
+dyne_require_static_pie()
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 # Exercise the installed package metadata used by Bitcoin Core, rather than

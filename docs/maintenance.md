@@ -130,6 +130,15 @@ insufficient: v2.5.0's compiler worked while its curl package metadata failed.
 Keep published release archives immutable; ship corrected packaging in a new
 release. Manual repair changes extracted metadata, not the release archive.
 
+Static-PIE consumers also need a correctly compiled CMake capability probe.
+`tests/cmake/RequireStaticPIE.cmake` scopes `-fPIE` to the probe and stops
+configuration if support is unavailable. Older CMake releases may otherwise
+compile a non-PIE probe object, reject it on ARM/RISC-V, and silently build
+ordinary static executables despite `POSITION_INDEPENDENT_CODE=ON`. The final
+ELF DYN check must remain enabled. This caused consumer checks to fail against
+v2.5.1 even though its static-PIE compilers and published archives were valid;
+fix the consumer probe rather than replacing those assets.
+
 After publication, the release workflow calls `action-consumer.yml` against the
 exact tag. It installs through the companion action, checks warm cache behavior,
 relocates the result and runs static consumers on all four targets. Only x86_64

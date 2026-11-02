@@ -3,8 +3,8 @@ project(DyneSDLConsumer LANGUAGES C CXX)
 # Test static pkg-config exports even with an unprepared compiler sysroot that
 # still contains libstdc++.so. Prepared release packages prune those DSOs.
 set(CMAKE_FIND_LIBRARY_SUFFIXES .a)
-include(CheckPIESupported)
-check_pie_supported()
+include("${CMAKE_CURRENT_LIST_DIR}/../cmake/RequireStaticPIE.cmake")
+dyne_require_static_pie()
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 find_package(SDL3 3.4 CONFIG REQUIRED COMPONENTS SDL3-static)
 find_package(SDL3_image 3.4 CONFIG REQUIRED COMPONENTS SDL3_image-static)
