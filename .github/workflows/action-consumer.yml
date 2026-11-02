@@ -1,0 +1,76 @@
+name: Published release action compatibility
+on:
+  workflow_call:
+    inputs:
+      release_tag:
+        description: Exact published dyne/musl release tag
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Exact published dyne/musl release tag
+        type: string
+        required: true
+permissions:
+  contents: read
+jobs:
+  consumer:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-linux-musl
+            suffix: x86_64
+          - target: aarch64-linux-musl
+            suffix: arm_64
+          - target: arm-linux-musleabihf
+            suffix: arm_hf
+          - target: riscv64-linux-musl
+            suffix: riscv_64
+    steps:
+      - uses: actions/checkout@v6
+      - name: Check out the companion installer
+        uses: actions/checkout@v6
+        with:
+          repository: dyne/musl-action
+          ref: main
+          path: .musl-action
+          persist-credentials: false
+      - name: Install consumer tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake pkgconf ccache openssl
+      - name: Install the published archive through the action
+        uses: ./.musl-action
+        id: first
+        with:
+          target_arch: ${{ matrix.suffix }}
+          version: ${{ inputs.release_tag }}
+      - name: Verify warm archive cache
+        uses: ./.musl-action
+        id: warm
+        with:
+          target_arch: ${{ matrix.suffix }}
+          version: ${{ steps.first.outputs.version }}
+          sha256: ${{ steps.first.outputs.sha256 }}
+      - name: Verify action outputs and relocated static consumers
+        env:
+          ARCH: ${{ matrix.target }}
+          CC: ${{ steps.warm.outputs.CC }}
+          CACHE_HIT: ${{ steps.warm.outputs.cache-hit }}
+          VERSION: ${{ steps.warm.outputs.version }}
+          DIGEST: ${{ steps.warm.outputs.sha256 }}
+          REQUESTED: ${{ inputs.release_tag }}
+        run: |
+          test "$VERSION" = "$REQUESTED"
+          test "$CACHE_HIT" = true
+          prefix=$(dirname "$(dirname "$(dirname "$CC")")")
+          moved="$prefix-relocated"
+          mv "$prefix" "$moved"
+          TOOLCHAIN="$moved/gcc-musl" TARGET_PREFIX="$moved/$ARCH" \
+            bash scripts/smoke.sh "$ARCH"
+          revision=$(git -C .musl-action rev-parse HEAD)
+          printf 'Release: %s\nTarget: %s\nSHA256: %s\nAction: %s\n' \
+            "$VERSION" "$ARCH" "$DIGEST" "$revision" >> "$GITHUB_STEP_SUMMARY"

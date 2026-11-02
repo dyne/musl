@@ -41,6 +41,7 @@ before making claims about what is currently published.
 | `libs/GNUmakefile` | Library versions, dependency graph, per-target sources and installation |
 | `settings.cmake` | Consumer/internal cross-compilation settings |
 | `prepare.sh`, `scripts/smoke.sh`, `tests/` | Package preparation, real C/C++ checks, offline regression suite |
+| `scripts/relocate-metadata.py`, `tests/curl/` | Relocatable pkg-config/CMake metadata and static C++20/libcurl consumers |
 | `.github/workflows/main.yml`, `.releaserc` | Validation before tagging; publication and retry |
 | `docs/maintenance.md` | Detailed package-update, validation and recovery runbook |
 | `docs/`, `.github/workflows/website.yml` | VitePress site and independent Pages deployment |
@@ -227,7 +228,9 @@ FORCE_STATIC adds static runtime linker flags.
 Preparation uses Bash, validates ARCH and uses target strip for target files
 and host strip for compiler executables. It removes DSOs/libtool metadata for
 the selected target while leaving other target sysroots alone, retains license
-directories, and copies README.txt/settings.cmake.
+directories, and copies README.txt/settings.cmake. Python 3 normalizes library
+metadata in `scripts/relocate-metadata.py` before packaging. Keep that helper and
+`tests/curl/` synchronized with the compatibility copies in dyne/musl-action.
 
 Run `make test` (Python 3 + PyYAML, Make >=4.3, curl, Git, CMake, cc/c++ and file) and
 `shellcheck prepare.sh scripts/*.sh` for changed automation. The offline suite
@@ -270,6 +273,67 @@ retry and checksum validation. Build logs/configure logs are retained 90 days.
 Only the release job has contents-write permission and mirror secrets.
 Alpine package revisions and action major tags can still change, so branch/
 runner pins are not proof of bit-for-bit reproducibility.
+
+### musl-action compatibility
+
+[dyne/musl-action](https://github.com/dyne/musl-action) is a separate repository
+and a supported consumer of these archives. Include it in release maintenance:
+
+1. Inspect its current source/revision and workflows before changing the
+   archive names, tag convention, manifest, layout, compiler tuples or host
+   requirements. Preserve its `target_arch`, `CC` and `CXX` interface unless an
+   action release explicitly documents a breaking change. Archive suffix
+   `riscv_64` maps to compiler tuple `riscv64-linux-musl`; the other mappings
+   are recorded above. All compilers require an x86_64 Linux host.
+2. Keep the installer independent of toolchain version bumps: it should accept
+   an exact release tag and optionally `latest`, resolve `latest` once, then
+   fetch the archive and `SHA256SUMS.txt` from that same GitHub release. Use
+   GitHub's returned tag/asset URLs, including legacy bare tags when explicitly
+   selected. A floating mirror is unsuitable for a pinned release. These are
+   requirements to verify/implement in the action, not inputs it necessarily
+   supports today. Consumers needing reproducible builds should pin both the
+   action revision and the toolchain release (and optionally an expected digest).
+3. Require successful HTTP responses, an unambiguous manifest entry and a valid
+   SHA-256 match before extraction. Never skip verification or downgrade to an
+   older release on failure. Key caches by runner host, target, resolved release,
+   archive digest and installer schema; prevent a partial restore or old files
+   from becoming a mixed installation. A checksum used only as a cache key does
+   not verify the archive. Check compiler paths and `-dumpmachine` after install.
+4. Test the action on an x86_64 Linux GitHub runner with cold and warm caches for
+   all four targets, an explicit release and `latest`. Check exported paths,
+   target tuples, C/C++ static linking and ELF machine/no INTERP or NEEDED;
+   execute x86_64 binaries, including threads and static PIE. Exercise a relocated
+   archive and the CMake consumer with the published package, not only the build
+   staging tree. Foreign execution still requires hardware/emulation. Check
+   missing tags/assets, HTTP errors and checksum mismatch fail clearly.
+5. Before publication, validate candidate archives against the installer where
+   possible. After publication, run an action consumer workflow against the
+   exact released assets, recording the release tag/digests, action commit and
+   CI run URL/results. Make this a post-publication release check; report action
+   failures separately from compiler failures. Update action code/tests/docs and
+   its own version only when installer behavior or the contract changes; an
+   unchanged archive contract should not need an action commit per musl release.
+
+Investigation baseline (2026-11-02): the old action's mirror manifest returned
+HTTP 403 while GitHub's v2.5.0 manifest worked. The old installer lacked release
+selection/archive verification and used the wrong RISC-V compiler tuple.
+Initial compiler/library smoke passed, but quietproof's detailed report exposed
+a separate v2.5.0 package defect: libcurl/LibreSSL pkg-config files and CURL/SSH2
+CMake metadata retained `/home/runner/work/musl/musl/dyne/<tuple>` paths.
+The added C++20/libcurl CMake consumer reproduces `cannot find -lssh2`, `-lz`,
+and `-lcrypto` before normalization and passes afterward. `prepare.sh` now
+normalizes metadata; the companion action repairs legacy metadata only after
+verifying the archive. Do not replace public v2.5.0 assets; publish corrected
+packages in a new release. Merge the companion action repair before enabling
+the new downstream consumer job, which needs its version/digest inputs.
+
+The release workflow explicitly calls `action-consumer.yml` after publication;
+do not rely solely on a `release: published` trigger, because publication uses
+GITHUB_TOKEN. The consumer workflow also supports manual dispatch for existing
+public releases. It tests four targets, a warm archive cache, relocation and
+static consumers, recording the exact action revision/tag/digest. For any
+claimed static-link failure, capture the archive digest, compiler path/version/
+target, exact link command and complete error before attributing it to a release.
 
 Website work uses `cd docs && npm ci && npm run build` (Node 22 in CI).
 VitePress uses base /musl/ and deploys docs/.vitepress/dist to GitHub Pages on

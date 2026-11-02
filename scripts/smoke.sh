@@ -28,6 +28,10 @@ cmake -S tests/dependencies -B "$build/dependencies" \
     -DCMAKE_TOOLCHAIN_FILE="$PWD/settings.cmake" -DARCH="$arch" \
     -DTOOLCHAIN_PREFIX="$compiler" -DTARGET_PREFIX="$target" -DCCACHE=OFF -DFORCE_STATIC=ON
 cmake --build "$build/dependencies" --parallel 2
+cmake -S tests/curl -B "$build/curl" \
+    -DCMAKE_TOOLCHAIN_FILE="$PWD/settings.cmake" -DARCH="$arch" \
+    -DTOOLCHAIN_PREFIX="$compiler" -DTARGET_PREFIX="$target" -DCCACHE=OFF -DFORCE_STATIC=ON
+cmake --build "$build/curl" --parallel 2
 cmake -S tests/sdl -B "$build/sdl" \
     -DCMAKE_TOOLCHAIN_FILE="$PWD/settings.cmake" -DARCH="$arch" \
     -DTOOLCHAIN_PREFIX="$compiler" -DTARGET_PREFIX="$target" -DCCACHE=OFF -DFORCE_STATIC=ON
@@ -39,6 +43,7 @@ cmake --build "$build/imgui" --parallel 2
 for binary in "$build/toolchain" "$build/static-pie" "$build/static-and-pie" \
     "$build/c" "$build/cpp" "$build/dependencies/dependencies" "$build/dependencies/pkgconfig" \
     "$build/dependencies/avena-dependencies" "$build/sdl/sdl" "$build/sdl/sdl-pkgconfig" \
+    "$build/curl/curl-pkgconfig" "$build/curl/curl-config" \
     "$build/imgui/imgui" "$build/imgui/imgui-pkgconfig" "$target/bin/ccache"; do
     headers=$("$readelf" -h -l -d "$binary")
     grep -q "$machine" <<< "$headers"
@@ -61,6 +66,8 @@ if [[ $arch == x86_64-linux-musl && $(uname -m) == x86_64 ]]; then
     "$build/dependencies/dependencies"
     "$build/dependencies/pkgconfig"
     "$build/dependencies/avena-dependencies"
+    "$build/curl/curl-pkgconfig"
+    "$build/curl/curl-config"
     ctest --test-dir "$build/sdl" --output-on-failure --parallel 1
     ctest --test-dir "$build/imgui" --output-on-failure --parallel 1
     "$target/bin/ccache" --version
