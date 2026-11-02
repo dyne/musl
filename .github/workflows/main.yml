@@ -151,6 +151,8 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: write
+    outputs:
+      published_tag: ${{ steps.published.outputs.tag }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -218,8 +220,19 @@ jobs:
           strip_components: 1
           overwrite: true
       - name: Publish GitHub release after mirror upload
+        id: published
         if: steps.semantic-release.outputs.new_release_published == 'true' || steps.retry.outputs.published == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_TAG: ${{ steps.retry.outputs.tag || steps.semantic-release.outputs.new_release_git_tag }}
-        run: gh release edit "$RELEASE_TAG" --draft=false
+        run: |
+          gh release edit "$RELEASE_TAG" --draft=false
+          printf 'tag=%s\n' "$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+
+  action-consumer:
+    name: Validate published release through musl-action
+    needs: release
+    if: needs.release.outputs.published_tag != ''
+    uses: ./.github/workflows/action-consumer.yml
+    with:
+      release_tag: ${{ needs.release.outputs.published_tag }}

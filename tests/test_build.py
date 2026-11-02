@@ -491,6 +491,15 @@ class Preparation(Workspace):
         self.assertNotEqual(run("bash", str(ROOT / "prepare.sh"), "../escape",
                                 cwd=self.work, env=self.env).returncode, 0)
 
+    def test_preparation_removes_build_host_paths_from_library_metadata(self):
+        metadata = self.target / "lib/pkgconfig/libcurl.pc"
+        metadata.parent.mkdir()
+        metadata.write_text(f"prefix=/home/runner/work/musl/musl/dyne/{self.arch}\n"
+                            "Libs: -L${prefix}/lib -lcurl -lssh2 -lz -lcrypto\n")
+        self.ok(run("bash", str(ROOT / "prepare.sh"), self.arch, cwd=self.work, env=self.env))
+        self.assertIn("prefix=${pcfiledir}/../..", metadata.read_text())
+        self.assertNotIn("/home/runner", metadata.read_text())
+
 
 class Release(Workspace):
     def publication_step(self, draft):

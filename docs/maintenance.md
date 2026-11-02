@@ -105,6 +105,40 @@ This does not validate a fresh compiler bootstrap or the Alpine environment.
 The `PREFIX` must be dedicated to this package set: configuration changes remove
 and reconstruct it to avoid retaining obsolete headers and libraries.
 
+### Relocation and the companion GitHub action
+
+Preparation runs `scripts/relocate-metadata.py` to make target pkg-config and
+CMake library metadata relative to its installed location. Keep this helper and
+the C++20/libcurl consumers in `tests/curl/` in sync with dyne/musl-action.
+`make smoke` checks both libcurl's pkg-config static flags and `CURL::libcurl`,
+including its SSH2/zlib/LibreSSL dependency closure. Disable pkgconf's automatic
+prefix repair in these tests so it cannot hide malformed package metadata.
+
+The published v2.5.0 archives contain build-host paths in this metadata. The
+repaired action normalizes verified extractions for compatibility. For a manual
+installation of an affected archive, use this source checkout's helper:
+
+```sh
+python3 scripts/relocate-metadata.py /path/to/dyne/x86_64-linux-musl
+TOOLCHAIN=/path/to/dyne/gcc-musl \
+TARGET_PREFIX=/path/to/dyne/x86_64-linux-musl make smoke ARCH=x86_64-linux-musl
+```
+
+Then move the SDK again and repeat with a fresh `SMOKE_BUILD_DIR`. The original
+build/install prefix must be unavailable. A plain compiler smoke test is
+insufficient: v2.5.0's compiler worked while its curl package metadata failed.
+Keep published release archives immutable; ship corrected packaging in a new
+release. Manual repair changes extracted metadata, not the release archive.
+
+After publication, the release workflow calls `action-consumer.yml` against the
+exact tag. It installs through the companion action, checks warm cache behavior,
+relocates the result and runs static consumers on all four targets. Only x86_64
+programs execute. Run the same workflow manually to validate an existing public
+release without republishing it. A failed post-publication check does not retract
+or replace already-public assets. Fix the action or make a new toolchain release
+as appropriate, then rerun validation. Install the companion action repair before
+merging this workflow: it requires the new `version` and `sha256` inputs.
+
 ## Sources and package changes
 
 `sources.urls` records one exact upstream URL per manifest key. Compiler

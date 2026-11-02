@@ -12,6 +12,10 @@ host_strip=${HOST_STRIP:-strip}
 }
 command -v "$host_strip" >/dev/null
 command -v file >/dev/null
+command -v python3 >/dev/null
+# Remove build-host library paths before packaging. Locate the helper relative
+# to this script, including when prepare.sh is run against an isolated stage.
+python3 "$(dirname "${BASH_SOURCE[0]}")/scripts/relocate-metadata.py" "$target"
 work_tmp=$(mktemp -d)
 trap 'rm -rf "$work_tmp"' EXIT
 
