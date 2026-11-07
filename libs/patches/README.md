@@ -37,3 +37,17 @@ closure. `libs/cmake/harfbuzzConfig.cmake` recreates it and Threads in consumers
 then loads the upstream export as `harfbuzz-targets.cmake`. This keeps the
 static SDK relocatable. Both the patch and package helper invalidate library
 state. Recheck the export and installed consumer when upgrading HarfBuzz.
+
+## Readline 8.3
+
+`readline83-001.patch` through `readline83-006.patch` are unchanged official
+patches from https://ftp.gnu.org/gnu/readline/readline-8.3-patches/, checked on
+2026-11-07. They apply sequentially with `patch --fuzz=0 -p0`, including their
+upstream `patchlevel` changes. The tracked patch bytes participate in the
+library configuration fingerprint. Recheck the complete upstream patch series
+when updating Readline.
+
+The archive SHA-256 pin was computed from the exact GNU HTTPS release bytes.
+Its detached signature verified against the key linked by the upstream
+maintainer at https://tiswww.case.edu/php/chet/gpgkey.asc, fingerprint
+`7C0135FB088AAF6C66C650B9BB5869F064EA74AB` (no independent trust certification).
