@@ -74,7 +74,9 @@ and the [ccache manual](https://ccache.dev/manual/latest.html).
 ## Package validation
 
 `make smoke ARCH=<tuple>` compiles C against curl, libssh2, LibreSSL, zlib and
-wide ncurses, plus C++20/thread/atomic/Kyoto Cabinet code. It checks ELF machine
+wide ncurses, plus C++20/thread/atomic/Kyoto Cabinet code. Separate Readline and
+History pkg-config consumers check line input, history expansion and static-PIE
+linking, including History without Readline/ncurses. It checks ELF machine
 identity and absence of dynamic dependencies, including packaged ccache.
 It also discovers installed Boost/SQLite/ZeroMQ packages through CMake, links
 GnuTLS and libsodium statically, and exercises CURVE and certificate-verified
@@ -230,6 +232,7 @@ available before accepting new pins.
 | libssh2 | https://libssh2.org/download/ |
 | ccache | https://github.com/ccache/ccache/releases |
 | ncurses | https://ftp.gnu.org/gnu/ncurses/ |
+| Readline / History | https://ftp.gnu.org/gnu/readline/ |
 | Kyoto Cabinet | https://dbmx.net/kyotocabinet/pkg/ |
 | Boost headers | https://www.boost.org/releases/latest/ |
 | SQLite | https://sqlite.org/download.html |

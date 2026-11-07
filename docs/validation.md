@@ -66,3 +66,61 @@ Expired logs leave the historical CI failure's cause unproven. Two additional
 defects found here have direct reproductions and regression coverage: a target
 tuple overriding musl's own ARCH, and host binutils beneath the target sysroot
 being sent to a foreign strip executable.
+
+## Readline addition (2026-11-07)
+
+GNU Readline 8.3, with unchanged official patches 001–006, was built from the
+SHA-256-pinned GNU archive. Its detached signature verified against the key
+published by the maintainer; see `libs/patches/README.md` for provenance.
+The static ncurses dependency also builds with `-fPIC` so that line editing
+can be linked into static PIE executables.
+
+| Check | Result |
+| --- | --- |
+| `make test` | 53 passed, no skips |
+| ShellCheck, Bash syntax, `git diff --check` | Passed |
+| VitePress `npm run build` | Passed |
+| Clean ncurses/Readline builds for all four target tuples | Passed with GCC 16.2.0 |
+| Repeated unchanged library builds | No archive rebuilds |
+| Installed files | Both archives, all eight public headers, both `.pc` files and GPL notice present; no shared objects |
+| Relocated pkg-config static-PIE and direct static consumers | All four targets linked with correct ELF machine and no INTERP/NEEDED |
+| Native Readline and standalone History consumers | Executed successfully before and after relocation |
+| Full native SDK smoke with new ncurses/Readline overlaid onto v2.5.1 | Passed |
+
+A headless Bitcoin Core build was stopped at the user's request; it is no
+longer required by musl CI or the test suite. Focused installed-package
+consumers and relocation checks remain required.
+
+The native library build used this checkout's staged compiler. Foreign builds
+used checksum-verified v2.5.1 compilers. Each build used an isolated
+`BUILD_ROOT=build/readline-libs`, target-specific `PREFIX` and the actual
+`libs/GNUmakefile` rules, selecting just `ncurses-6.6.tar.gz readline-8.3.tar.gz`
+through `ARCHIVES` for the focused build. Relocation removed the original
+library prefix before configuring the consumers in `tests/readline/`.
+History was independently linked without Readline or ncurses. Foreign binaries
+were inspected but not executed. This does not validate a fresh compiler
+bootstrap or the privileged production Alpine build.
+
+The companion installer at revision
+`244f10edd4456601a110815c7fa42b9f4c0ce761` passed
+`python3 tests/live.py --versions v2.5.1 --work ../musl/.cache/readline-action`
+for all four published targets, including cold extraction, warm archive reuse,
+relocation and C/C++ consumers. `CCACHE_DIR` was set inside the workspace for
+these checks. The checked archive SHA-256 values were:
+
+| Release suffix | v2.5.1 SHA-256 |
+| --- | --- |
+| x86_64 | `02556d8cabc4686676c19cdc718262f14ab98d3dc109469fab99ae63caf75c13` |
+| arm_64 | `144327df1488d90ce9271acd157bb6a71b2f28162b12c9597c0b685441289399` |
+| arm_hf | `078aaffd45cf13abef0e5642787e64d11399289eee1e81468be942a83ffd538b` |
+| riscv_64 | `29b50f269d02e20ee84eb8985a185c34abd5a4b153798885990396d042317541` |
+
+No companion action change or release was needed for this additive library
+package. Those installer results cover the existing published release; the
+next release containing Readline still requires the configured post-publication
+GitHub action-consumer workflow against its exact assets. No release was
+published during this change.
+
+Build, consumer, relocation, offline-test and action evidence is retained under
+`build/readline-validation/`; source caches and isolated installations are in
+`.cache/readline-*`.

@@ -32,6 +32,7 @@ CURL ?= curl-8.23.0
 SSH2 ?= libssh2-1.11.1
 CCACHE ?= ccache-4.14.2
 NCURSES ?= ncurses-6.6
+READLINE ?= readline-8.3
 KYOTOCAB ?= kyotocabinet-1.2.80
 BOOST ?= boost-1.92.0
 SQLITE ?= sqlite-autoconf-3540100
@@ -49,13 +50,17 @@ IMGUI ?= imgui-1.93.0
 BOOST_VERSION := $(patsubst boost-%,%,$(BOOST))
 ZMQ_PATCHES := $(sort $(wildcard patches/$(ZMQ)/*.patch))
 HARFBUZZ_PATCHES := $(sort $(wildcard patches/$(HARFBUZZ)/*.patch))
-LIBRARY_PATCHES := $(ZMQ_PATCHES) $(HARFBUZZ_PATCHES)
+READLINE_PATCHES := $(sort $(wildcard patches/$(READLINE)/*.patch))
+LIBRARY_PATCHES := $(ZMQ_PATCHES) $(HARFBUZZ_PATCHES) $(READLINE_PATCHES)
 PACKAGE_CMAKE := $(sort $(wildcard cmake/*.cmake cmake/imgui/*))
 
-PACKAGES := $(LIBSSL) $(ZLIB) $(CURL) $(SSH2) $(CCACHE) $(NCURSES) $(KYOTOCAB) $(BOOST) $(SQLITE) $(GMP) $(NETTLE) $(GNUTLS) $(SODIUM) $(ZMQ) $(SDL) $(SDLIMAGE) $(SDLTTF) $(FREETYPE) $(HARFBUZZ) $(IMGUI)
+PACKAGES := $(LIBSSL) $(ZLIB) $(CURL) $(SSH2) $(CCACHE) $(NCURSES) $(READLINE) $(KYOTOCAB) $(BOOST) $(SQLITE) $(GMP) $(NETTLE) $(GNUTLS) $(SODIUM) $(ZMQ) $(SDL) $(SDLIMAGE) $(SDLTTF) $(FREETYPE) $(HARFBUZZ) $(IMGUI)
 ARCHIVES := $(LIBSSL).tar.gz $(ZLIB).tar.gz $(CURL).tar.xz $(SSH2).tar.xz $(CCACHE).tar.xz $(NCURSES).tar.gz $(KYOTOCAB).tar.gz \
 	$(BOOST).tar.xz $(SQLITE).tar.gz $(GMP).tar.xz $(NETTLE).tar.gz $(GNUTLS).tar.xz $(SODIUM).tar.gz $(ZMQ).tar.gz \
-	$(SDL).tar.gz $(SDLIMAGE).tar.gz $(SDLTTF).tar.gz $(FREETYPE).tar.xz $(HARFBUZZ).tar.xz $(IMGUI).tar.gz
+	$(SDL).tar.gz $(SDLIMAGE).tar.gz $(SDLTTF).tar.gz $(FREETYPE).tar.xz $(HARFBUZZ).tar.xz $(IMGUI).tar.gz $(READLINE).tar.gz
+READLINE_OUTPUTS := $(T)/lib/libreadline.a $(T)/lib/libhistory.a \
+	$(addprefix $(T)/include/readline/,readline.h history.h keymaps.h chardefs.h tilde.h rlstdc.h rlconf.h rltypedefs.h) \
+	$(T)/lib/pkgconfig/readline.pc $(T)/lib/pkgconfig/history.pc
 BOOST_OUTPUTS := $(T)/include/boost/version.hpp $(T)/include/boost/multi_index_container.hpp \
 	$(T)/lib/cmake/Boost-$(BOOST_VERSION)/BoostConfig.cmake
 SQLITE_OUTPUTS := $(T)/lib/libsqlite3.a $(T)/include/sqlite3.h $(T)/lib/pkgconfig/sqlite3.pc
@@ -83,7 +88,7 @@ IMGUI_OUTPUTS := $(T)/lib/libimgui.a $(T)/include/imgui/imgui.h \
 OUTPUTS := $(T)/lib/libssl.a $(T)/lib/libcrypto.a $(T)/lib/libz.a \
 	$(T)/lib/libcurl.a $(T)/lib/libssh2.a $(T)/lib/libncursesw.a \
 	$(T)/lib/libkyotocabinet.a $(T)/bin/ccache $(BOOST_OUTPUTS) $(SQLITE_OUTPUTS) $(GMP_OUTPUTS) $(NETTLE_OUTPUTS) $(GNUTLS_OUTPUTS) $(SODIUM_OUTPUTS) $(ZMQ_OUTPUTS) \
-	$(SDL_OUTPUTS) $(SDLIMAGE_OUTPUTS) $(SDLTTF_OUTPUTS) $(FREETYPE_OUTPUTS) $(HARFBUZZ_OUTPUTS) $(IMGUI_OUTPUTS)
+	$(SDL_OUTPUTS) $(SDLIMAGE_OUTPUTS) $(SDLTTF_OUTPUTS) $(FREETYPE_OUTPUTS) $(HARFBUZZ_OUTPUTS) $(IMGUI_OUTPUTS) $(READLINE_OUTPUTS)
 CACHE_ENV = sh "$(R)/scripts/compiler-cache.sh" "$(CCACHE_LAUNCHER)" "$(TOOLCHAIN)/bin/$(ARCH)-gcc"
 AUTOCONF_ENV = $(CACHE_ENV) env CC="$(CC)" CXX="$(CXX)" AR="$(AR)" RANLIB="$(RANLIB)" \
 	CFLAGS="$(CFLAGS)" CXXFLAGS="$(CXXFLAGS)" LDFLAGS="$(LDFLAGS)"
@@ -163,7 +168,7 @@ $(T)/lib/libcurl.a: $(B)/$(CURL)/.extracted $(T)/lib/libssl.a $(T)/lib/libcrypto
 	$(CACHE_ENV) cmake --install "$(B)/$(CURL)/build"
 
 $(T)/lib/libncursesw.a: $(B)/$(NCURSES)/.extracted
-	cd "$(B)/$(NCURSES)" && $(AUTOCONF_ENV) ./configure --prefix="$(T)" \
+	cd "$(B)/$(NCURSES)" && $(AUTOCONF_ENV) CFLAGS="$(CFLAGS) -fPIC" ./configure --prefix="$(T)" \
 		--build=x86_64-linux-musl --host=$(ARCH) --enable-widec \
 		--with-normal --without-shared --without-cxx-binding --without-ada \
 		--without-debug --without-tests --without-progs --disable-db-install \
@@ -171,6 +176,30 @@ $(T)/lib/libncursesw.a: $(B)/$(NCURSES)/.extracted
 		--with-terminfo-dirs=/etc/terminfo:/lib/terminfo:/usr/share/terminfo
 	$(CACHE_ENV) $(MAKE) -C "$(B)/$(NCURSES)" -j$(JOBS)
 	$(CACHE_ENV) $(MAKE) -C "$(B)/$(NCURSES)" install
+
+# Official upstream patches use -p0 and advance patchlevel in order.
+$(B)/$(READLINE)/.patched: $(B)/$(READLINE)/.extracted $(READLINE_PATCHES)
+	@set -e; for source_patch in $(READLINE_PATCHES); do \
+		patch --fuzz=0 -d "$(B)/$(READLINE)" -p0 < "$$source_patch"; \
+	done
+	touch "$@"
+
+$(READLINE_OUTPUTS) &: $(B)/$(READLINE)/.patched $(T)/lib/libncursesw.a
+	cd "$(B)/$(READLINE)" && $(AUTOCONF_ENV) CFLAGS="$(CFLAGS) -fPIC" \
+		CPPFLAGS="-I$(T)/include -I$(T)/include/ncursesw" LDFLAGS="$(LDFLAGS) -L$(T)/lib" \
+		bash_cv_termcap_lib=libncursesw ./configure --prefix="$(T)" --libdir="$(T)/lib" \
+		--build=x86_64-linux-musl --host=$(ARCH) --enable-static --disable-shared --with-curses
+	$(CACHE_ENV) $(MAKE) -C "$(B)/$(READLINE)" -j$(JOBS) static
+	$(CACHE_ENV) $(MAKE) -C "$(B)/$(READLINE)" install-static
+	sed -i -e 's|^prefix=.*|prefix=$${pcfiledir}/../..|' \
+		-e 's|^exec_prefix=.*|exec_prefix=$${prefix}|' -e 's|^libdir=.*|libdir=$${prefix}/lib|' \
+		-e 's|^includedir=.*|includedir=$${prefix}/include|' \
+		"$(T)/lib/pkgconfig/readline.pc" "$(T)/lib/pkgconfig/history.pc"
+	# ncurses does not install a .pc file in our profile; export the static closure directly.
+	sed -i -e 's|^Requires.private:.*|Libs.private: -lncursesw|' "$(T)/lib/pkgconfig/readline.pc"
+	rm -f "$(T)/lib/libreadline.old" "$(T)/lib/libhistory.old"
+	mkdir -p "$(T)/share/licenses/readline"
+	cp "$(B)/$(READLINE)/COPYING" "$(T)/share/licenses/readline/"
 
 $(T)/lib/libkyotocabinet.a: $(B)/$(KYOTOCAB)/.extracted
 	cd "$(B)/$(KYOTOCAB)" && $(AUTOCONF_ENV) ./configure --prefix="$(T)" \
