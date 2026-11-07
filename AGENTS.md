@@ -170,6 +170,11 @@ LibreSSL provides OpenSSL-compatible crypto; zlib-ng uses
 zlib compatibility mode. curl explicitly depends on SSL, zlib and SSH2.
 ncurses builds its wide-character static library without host-tic-dependent
 database installation; runtime terminfo comes from the target system.
+GNU Readline 8.3 with official patches 001–006 installs libreadline.a,
+libhistory.a and all public readline/ headers. It uses target ncursesw for
+terminal support; relocatable readline.pc exports -lncursesw for static links.
+history.pc needs no terminal library. Smoke tests exercise both packages
+separately as static PIE consumers. Preserve the upstream GPL license.
 Kyoto disables zlib and respects selected compile flags instead of upstream's
 automatic -march=native/-O2 additions. Packaged ccache targets ARCH and is not a
 substitute for the x86_64 host ccache during cross-compilation.
@@ -248,7 +253,8 @@ C++20/thread/atomic/Kyoto code, checks ELF architecture/static dependencies, and
 runs x86_64 binaries on compatible hosts. The dependency CMake consumer exercises
 Boost/SQLite, libsodium encryption/tamper rejection, CURVE loopback TCP and WSS
 with a fresh certificate and wrong-hostname rejection. For package changes,
-also validate relocation and a headless Bitcoin Core build with IPC disabled. It also checks the ported static-PIE
+also validate relocation. A full Bitcoin Core build is optional and is not a
+required musl CI or test-suite check. Smoke tests also check the ported static-PIE
 link specs and libc sorting/GB18030/regex functionality. Foreign runtime behavior needs hardware
 or emulation. Never infer full build success from lint or cross-linking alone.
 The [validation report](docs/validation.md) records the initial 28-test result,

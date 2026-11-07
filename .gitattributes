@@ -1,2 +1,4 @@
 # Unified diffs preserve upstream whitespace, including blank context lines.
 gcc-musl/patches/**/*.diff -whitespace
+# Keep the official Readline patches byte-for-byte, including context whitespace.
+libs/patches/readline-8.3/*.patch -whitespace

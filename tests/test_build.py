@@ -161,7 +161,7 @@ class LibraryBuilds(Workspace):
         cache = self.work / ".cache/sources"
         cache.mkdir(parents=True)
         recipe = (ROOT / "libs/GNUmakefile").read_text()
-        packages = dict(re.findall(r"^(LIBSSL|ZLIB|CURL|SSH2|CCACHE|NCURSES|KYOTOCAB|BOOST|SQLITE|ZMQ|GMP|NETTLE|GNUTLS|SODIUM|SDL|SDLIMAGE|SDLTTF|FREETYPE|HARFBUZZ|IMGUI) \?= (\S+)$",
+        packages = dict(re.findall(r"^(LIBSSL|ZLIB|CURL|SSH2|CCACHE|NCURSES|READLINE|KYOTOCAB|BOOST|SQLITE|ZMQ|GMP|NETTLE|GNUTLS|SODIUM|SDL|SDLIMAGE|SDLTTF|FREETYPE|HARFBUZZ|IMGUI) \?= (\S+)$",
                                    recipe, re.MULTILINE))
         archives = [packages[key] + suffix for key, suffix in
                     [("LIBSSL", ".tar.gz"), ("ZLIB", ".tar.gz"), ("CURL", ".tar.xz"),
@@ -170,7 +170,7 @@ class LibraryBuilds(Workspace):
                      ("ZMQ", ".tar.gz"), ("GMP", ".tar.xz"), ("NETTLE", ".tar.gz"),
                      ("GNUTLS", ".tar.xz"), ("SODIUM", ".tar.gz"), ("SDL", ".tar.gz"),
                      ("SDLIMAGE", ".tar.gz"), ("SDLTTF", ".tar.gz"), ("FREETYPE", ".tar.xz"),
-                     ("HARFBUZZ", ".tar.xz"), ("IMGUI", ".tar.gz")]]
+                     ("HARFBUZZ", ".tar.xz"), ("IMGUI", ".tar.gz"), ("READLINE", ".tar.gz")]]
         shutil.copytree(ROOT / "libs/patches", self.work / "libs/patches")
         shutil.copytree(ROOT / "libs/cmake", self.work / "libs/cmake")
         self.ssl_package = packages["LIBSSL"]
@@ -200,11 +200,12 @@ class LibraryBuilds(Workspace):
             recipe += f'\t@touch "$@"\n\t@echo {name} >> "$(T)/order"\n'
         recipe += '\n$(B)/$(ZMQ)/.patched:\n\t@touch "$@"\n'
         recipe += '\n$(B)/$(HARFBUZZ)/.patched:\n\t@touch "$@"\n'
+        recipe += '\n$(B)/$(READLINE)/.patched:\n\t@touch "$@"\n'
         for variable, name in [("BOOST", "boost"), ("SQLITE", "sqlite"), ("GMP", "gmp"),
                                ("NETTLE", "nettle"), ("GNUTLS", "gnutls"), ("SODIUM", "sodium"),
                                ("ZMQ", "zmq"), ("SDL", "sdl"), ("SDLIMAGE", "sdlimage"),
                                ("SDLTTF", "sdlttf"), ("FREETYPE", "freetype"), ("HARFBUZZ", "harfbuzz"),
-                               ("IMGUI", "imgui")]:
+                               ("IMGUI", "imgui"), ("READLINE", "readline")]:
             recipe += f'\n$({variable}_OUTPUTS) &:\n'
             recipe += f'\t@for output in $({variable}_OUTPUTS); do mkdir -p "$$(dirname "$$output")"; touch "$$output"; done\n'
             recipe += f'\t@echo {name} >> "$(T)/order"\n'
@@ -226,13 +227,14 @@ class LibraryBuilds(Workspace):
         first = self.order()
         self.assertEqual(set(first), {"ssl", "z", "ssh", "curl", "ncurses", "kyoto", "ccache",
                                       "boost", "sqlite", "gmp", "nettle", "gnutls", "sodium", "zmq",
-                                      "sdl", "sdlimage", "sdlttf", "freetype", "harfbuzz", "imgui"})
+                                      "sdl", "sdlimage", "sdlttf", "freetype", "harfbuzz", "imgui", "readline"})
         self.assertLess(first.index("ssl"), first.index("ssh"))
         self.assertLess(first.index("ssh"), first.index("curl"))
         for dependency, dependent in [("gmp", "nettle"), ("nettle", "gnutls"),
                                       ("z", "gnutls"), ("gnutls", "zmq"), ("sodium", "zmq"),
                                       ("sdl", "sdlimage"), ("sdl", "sdlttf"), ("z", "freetype"),
-                                      ("freetype", "harfbuzz"), ("harfbuzz", "sdlttf"), ("sdl", "imgui")]:
+                                      ("freetype", "harfbuzz"), ("harfbuzz", "sdlttf"), ("sdl", "imgui"),
+                                      ("ncurses", "readline")]:
             self.assertLess(first.index(dependency), first.index(dependent))
         self.make("libs")
         self.assertEqual(self.order(), first)
@@ -259,7 +261,7 @@ class LibraryBuilds(Workspace):
         before = (self.target / "lib/libcurl.a").stat().st_mtime_ns
         (self.target / "obsolete-header.h").touch()
         self.make("libs", "CFLAGS=-Os -DCHANGED")
-        self.assertEqual(len(self.order()), 20)
+        self.assertEqual(len(self.order()), 21)
         self.assertGreater((self.target / "lib/libcurl.a").stat().st_mtime_ns, before)
         self.assertFalse((self.target / "obsolete-header.h").exists())
         self.make("libs", "ARCH=arm-linux-musleabihf")
@@ -309,7 +311,7 @@ class LibraryBuilds(Workspace):
         patch.write_text(patch.read_text() + "\n")
         self.make("libs")
         self.assertFalse(marker.exists())
-        self.assertEqual(len(self.order()), 20)
+        self.assertEqual(len(self.order()), 21)
 
     def test_missing_sdl_metadata_and_font_header_rebuild_dependency_closure(self):
         self.make("libs")
@@ -326,9 +328,10 @@ class LibraryBuilds(Workspace):
         self.make("libs")
         self.assertEqual(self.order()[before:], ["imgui"])
 
-    def test_font_patch_and_package_helper_changes_invalidate_staged_prefix(self):
+    def test_package_patches_and_helpers_invalidate_staged_prefix(self):
         self.make("libs")
         inputs = [next((self.work / "libs/patches").glob("harfbuzz-*/*.patch")),
+                  next((self.work / "libs/patches").glob("readline-*/*.patch")),
                   self.work / "libs/cmake/harfbuzzConfig.cmake",
                   self.work / "libs/cmake/imgui/CMakeLists.txt"]
         for package_input in inputs:
@@ -337,7 +340,18 @@ class LibraryBuilds(Workspace):
             package_input.write_text(package_input.read_text() + "\n")
             self.make("libs")
             self.assertFalse(marker.exists())
-            self.assertEqual(len(self.order()), 20)
+            self.assertEqual(len(self.order()), 21)
+
+    def test_missing_readline_archives_headers_and_metadata_reinstall_together(self):
+        self.make("libs")
+        for output in ["lib/libreadline.a", "lib/libhistory.a", "include/readline/readline.h",
+                       "include/readline/history.h", "include/readline/rltypedefs.h",
+                       "lib/pkgconfig/readline.pc", "lib/pkgconfig/history.pc"]:
+            before = len(self.order())
+            (self.target / output).unlink()
+            self.make("libs")
+            self.assertEqual(self.order()[before:], ["readline"])
+            self.assertTrue((self.target / output).is_file())
 
 
 class ToolchainState(Workspace):

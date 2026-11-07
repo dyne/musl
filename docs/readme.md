@@ -73,6 +73,13 @@ The source configuration includes `binutils-2.47.tar.xz`, `gcc-16.2.0.tar.xz`, `
 
 Additional base libraries and utilities are `libressl-4.4.0`, `zlib-ng-2.3.3`, `curl-8.23.0`, `libssh2-1.11.1`, `ccache-4.14.2`, `ncurses-6.6` (wide-character static library), and `kyotocabinet-1.2.80`.
 
+GNU Readline **8.3** (official patches 001–006) provides `libreadline.a`,
+`libhistory.a` and the public `include/readline/` headers. Link line editing
+with `-lreadline -lncursesw`, or use `pkg-config --static --cflags --libs readline`.
+History-only applications can use `-lhistory` or the `history` pkg-config package
+without ncurses. Both pkg-config files remain valid when the SDK moves.
+Readline retains its upstream GPLv3-or-later license in `share/licenses/readline/`.
+
 The SDK also includes Boost **1.92.0** headers, SQLite **3.54.1**, ZeroMQ
 **4.3.5**, libsodium **1.0.22**, GnuTLS **3.8.13**, target GMP **6.3.0** and
 Nettle/hogweed **3.10.2**. ZeroMQ includes CURVE encryption and secure WebSockets
