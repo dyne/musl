@@ -47,6 +47,9 @@ SDLTTF ?= SDL3_ttf-3.2.2
 FREETYPE ?= freetype-2.15.0
 HARFBUZZ ?= harfbuzz-15.0.0
 IMGUI ?= imgui-1.93.0
+LIBFFI ?= libffi-3.8.1
+PCRE2 ?= pcre2-10.49
+GLIB ?= glib-2.90.1
 BOOST_VERSION := $(patsubst boost-%,%,$(BOOST))
 ZMQ_PATCHES := $(sort $(wildcard patches/$(ZMQ)/*.patch))
 HARFBUZZ_PATCHES := $(sort $(wildcard patches/$(HARFBUZZ)/*.patch))
@@ -54,10 +57,11 @@ READLINE_PATCHES := $(sort $(wildcard patches/$(READLINE)/*.patch))
 LIBRARY_PATCHES := $(ZMQ_PATCHES) $(HARFBUZZ_PATCHES) $(READLINE_PATCHES)
 PACKAGE_CMAKE := $(sort $(wildcard cmake/*.cmake cmake/imgui/*))
 
-PACKAGES := $(LIBSSL) $(ZLIB) $(CURL) $(SSH2) $(CCACHE) $(NCURSES) $(READLINE) $(KYOTOCAB) $(BOOST) $(SQLITE) $(GMP) $(NETTLE) $(GNUTLS) $(SODIUM) $(ZMQ) $(SDL) $(SDLIMAGE) $(SDLTTF) $(FREETYPE) $(HARFBUZZ) $(IMGUI)
+PACKAGES := $(LIBSSL) $(ZLIB) $(CURL) $(SSH2) $(CCACHE) $(NCURSES) $(READLINE) $(KYOTOCAB) $(BOOST) $(SQLITE) $(GMP) $(NETTLE) $(GNUTLS) $(SODIUM) $(ZMQ) $(SDL) $(SDLIMAGE) $(SDLTTF) $(FREETYPE) $(HARFBUZZ) $(IMGUI) $(LIBFFI) $(PCRE2) $(GLIB)
 ARCHIVES := $(LIBSSL).tar.gz $(ZLIB).tar.gz $(CURL).tar.xz $(SSH2).tar.xz $(CCACHE).tar.xz $(NCURSES).tar.gz $(KYOTOCAB).tar.gz \
 	$(BOOST).tar.xz $(SQLITE).tar.gz $(GMP).tar.xz $(NETTLE).tar.gz $(GNUTLS).tar.xz $(SODIUM).tar.gz $(ZMQ).tar.gz \
-	$(SDL).tar.gz $(SDLIMAGE).tar.gz $(SDLTTF).tar.gz $(FREETYPE).tar.xz $(HARFBUZZ).tar.xz $(IMGUI).tar.gz $(READLINE).tar.gz
+	$(SDL).tar.gz $(SDLIMAGE).tar.gz $(SDLTTF).tar.gz $(FREETYPE).tar.xz $(HARFBUZZ).tar.xz $(IMGUI).tar.gz $(READLINE).tar.gz \
+	$(LIBFFI).tar.gz $(PCRE2).tar.gz $(GLIB).tar.xz
 READLINE_OUTPUTS := $(T)/lib/libreadline.a $(T)/lib/libhistory.a \
 	$(addprefix $(T)/include/readline/,readline.h history.h keymaps.h chardefs.h tilde.h rlstdc.h rlconf.h rltypedefs.h) \
 	$(T)/lib/pkgconfig/readline.pc $(T)/lib/pkgconfig/history.pc
@@ -85,11 +89,24 @@ HARFBUZZ_OUTPUTS := $(T)/lib/libharfbuzz.a $(T)/include/harfbuzz/hb.h \
 IMGUI_OUTPUTS := $(T)/lib/libimgui.a $(T)/include/imgui/imgui.h \
 	$(T)/include/imgui/backends/imgui_impl_sdl3.h $(T)/include/imgui/backends/imgui_impl_sdlrenderer3.h \
 	$(T)/lib/pkgconfig/imgui.pc $(T)/lib/cmake/imgui/imguiConfig.cmake $(T)/lib/cmake/imgui/imguiTargets.cmake
+LIBFFI_OUTPUTS := $(T)/lib/libffi.a $(T)/include/ffi.h $(T)/include/ffitarget.h $(T)/lib/pkgconfig/libffi.pc \
+	$(T)/share/licenses/libffi/LICENSE
+PCRE2_OUTPUTS := $(T)/lib/libpcre2-8.a $(T)/include/pcre2.h $(T)/lib/pkgconfig/libpcre2-8.pc \
+	$(T)/share/licenses/pcre2/LICENCE.md
+GLIB_OUTPUTS := $(addprefix $(T)/lib/lib,$(addsuffix -2.0.a,glib gobject gmodule gthread gio)) \
+	$(addprefix $(T)/lib/pkgconfig/,$(addsuffix -2.0.pc,glib gobject gmodule gmodule-no-export gthread gio gio-unix)) \
+	$(addprefix $(T)/include/glib-2.0/,glib.h glib-object.h gmodule.h gio/gio.h) \
+	$(T)/include/gio-unix-2.0/gio/gunixinputstream.h $(T)/lib/glib-2.0/include/glibconfig.h \
+	$(T)/share/licenses/glib/COPYING $(T)/share/licenses/glib/gvdb/COPYING
 OUTPUTS := $(T)/lib/libssl.a $(T)/lib/libcrypto.a $(T)/lib/libz.a \
 	$(T)/lib/libcurl.a $(T)/lib/libssh2.a $(T)/lib/libncursesw.a \
 	$(T)/lib/libkyotocabinet.a $(T)/bin/ccache $(BOOST_OUTPUTS) $(SQLITE_OUTPUTS) $(GMP_OUTPUTS) $(NETTLE_OUTPUTS) $(GNUTLS_OUTPUTS) $(SODIUM_OUTPUTS) $(ZMQ_OUTPUTS) \
-	$(SDL_OUTPUTS) $(SDLIMAGE_OUTPUTS) $(SDLTTF_OUTPUTS) $(FREETYPE_OUTPUTS) $(HARFBUZZ_OUTPUTS) $(IMGUI_OUTPUTS) $(READLINE_OUTPUTS)
+	$(SDL_OUTPUTS) $(SDLIMAGE_OUTPUTS) $(SDLTTF_OUTPUTS) $(FREETYPE_OUTPUTS) $(HARFBUZZ_OUTPUTS) $(IMGUI_OUTPUTS) $(READLINE_OUTPUTS) \
+	$(LIBFFI_OUTPUTS) $(PCRE2_OUTPUTS) $(GLIB_OUTPUTS)
 CACHE_ENV = sh "$(R)/scripts/compiler-cache.sh" "$(CCACHE_LAUNCHER)" "$(TOOLCHAIN)/bin/$(ARCH)-gcc"
+comma := ,
+MESON_LAUNCHER = $(if $(CCACHE_LAUNCHER),'$(CCACHE_LAUNCHER)'$(comma))
+TARGET_CPU := $(firstword $(subst -, ,$(ARCH)))
 AUTOCONF_ENV = $(CACHE_ENV) env CC="$(CC)" CXX="$(CXX)" AR="$(AR)" RANLIB="$(RANLIB)" \
 	CFLAGS="$(CFLAGS)" CXXFLAGS="$(CXXFLAGS)" LDFLAGS="$(LDFLAGS)"
 CMAKE_FLAGS = -G Ninja -DARCH=$(ARCH) -DROOT="$(R)" -DTARGET_PREFIX="$(T)" \
@@ -150,6 +167,46 @@ $(T)/lib/libz.a: $(B)/$(ZLIB)/.extracted
 	sed -i -e 's|^prefix=.*|prefix=$${pcfiledir}/../..|' \
 		-e 's|^exec_prefix=.*|exec_prefix=$${prefix}|' -e 's|^libdir=.*|libdir=$${prefix}/lib|' \
 		-e 's|^includedir=.*|includedir=$${prefix}/include|' "$(T)/lib/pkgconfig/zlib.pc"
+
+$(LIBFFI_OUTPUTS) &: $(B)/$(LIBFFI)/.extracted
+	cd "$(B)/$(LIBFFI)" && $(AUTOCONF_ENV) CFLAGS="$(CFLAGS) -fPIC" \
+		./configure --prefix="$(T)" --libdir="$(T)/lib" --build=x86_64-linux-musl --host=$(ARCH) \
+		--disable-shared --enable-static --with-pic --disable-docs
+	$(CACHE_ENV) $(MAKE) -C "$(B)/$(LIBFFI)" -j$(JOBS)
+	$(CACHE_ENV) $(MAKE) -C "$(B)/$(LIBFFI)" install
+	sed -i -e 's|^prefix=.*|prefix=$${pcfiledir}/../..|' \
+		-e 's|^libdir=.*|libdir=$${prefix}/lib|' "$(T)/lib/pkgconfig/libffi.pc"
+	install -Dm644 "$(B)/$(LIBFFI)/LICENSE" "$(T)/share/licenses/libffi/LICENSE"
+
+$(PCRE2_OUTPUTS) &: $(B)/$(PCRE2)/.extracted
+	$(CACHE_ENV) cmake -S "$(B)/$(PCRE2)" -B "$(B)/$(PCRE2)/build" $(CMAKE_FLAGS) \
+		-DCMAKE_INSTALL_LIBDIR=lib -DBUILD_SHARED_LIBS=OFF -DBUILD_STATIC_LIBS=ON \
+		-DCMAKE_POSITION_INDEPENDENT_CODE=ON -DPCRE2_BUILD_PCRE2GREP=OFF -DPCRE2_BUILD_TESTS=OFF
+	$(CACHE_ENV) cmake --build "$(B)/$(PCRE2)/build" --parallel $(JOBS)
+	$(CACHE_ENV) cmake --install "$(B)/$(PCRE2)/build"
+	sed -i 's|^prefix=.*|prefix=$${pcfiledir}/../..|' "$(T)"/lib/pkgconfig/libpcre2-*.pc
+	install -Dm644 "$(B)/$(PCRE2)/LICENCE.md" "$(T)/share/licenses/pcre2/LICENCE.md"
+
+# Keep host tools native and limit Meson's target pkg-config lookup to this prefix.
+$(GLIB_OUTPUTS) &: $(B)/$(GLIB)/.extracted $(LIBFFI_OUTPUTS) $(PCRE2_OUTPUTS) $(T)/lib/libz.a
+	{ printf '%s\n' '[binaries]' \
+		"c = [$(MESON_LAUNCHER) '$(TOOLCHAIN)/bin/$(ARCH)-gcc']" \
+		"cpp = [$(MESON_LAUNCHER) '$(TOOLCHAIN)/bin/$(ARCH)-g++']" \
+		"ar = '$(AR)'" "pkg-config = 'pkg-config'"; \
+	  printf '%s\n' '[host_machine]' "system = 'linux'" "endian = 'little'" \
+		"cpu_family = '$(TARGET_CPU)'" "cpu = '$(TARGET_CPU)'"; \
+	  printf '%s\n' '[properties]' 'needs_exe_wrapper = true' "pkg_config_libdir = '$(PKG_CONFIG_LIBDIR)'"; \
+	} > "$(B)/$(GLIB)/cross.ini"
+	$(CACHE_ENV) env CFLAGS="$(CFLAGS)" CXXFLAGS="$(CXXFLAGS)" LDFLAGS="$(LDFLAGS)" \
+		meson setup "$(B)/$(GLIB)/build" "$(B)/$(GLIB)" --cross-file "$(B)/$(GLIB)/cross.ini" \
+		--prefix "$(T)" --libdir lib --default-library static --wrap-mode nodownload \
+		-Db_staticpic=true -Dpkgconfig.relocatable=true -Dtests=false -Dintrospection=disabled \
+		-Dnls=disabled -Ddocumentation=false -Dman-pages=disabled -Dlibelf=disabled \
+		-Dlibmount=disabled -Dselinux=disabled -Dsysprof=disabled -Ddtrace=disabled -Dsystemtap=disabled
+	$(CACHE_ENV) meson compile -C "$(B)/$(GLIB)/build" -j $(JOBS)
+	$(CACHE_ENV) meson install -C "$(B)/$(GLIB)/build" --no-rebuild
+	install -Dm644 "$(B)/$(GLIB)/COPYING" "$(T)/share/licenses/glib/COPYING"
+	install -Dm644 "$(B)/$(GLIB)/subprojects/gvdb/COPYING" "$(T)/share/licenses/glib/gvdb/COPYING"
 
 $(T)/lib/libssh2.a: $(B)/$(SSH2)/.extracted $(T)/lib/libssl.a $(T)/lib/libcrypto.a $(T)/lib/libz.a
 	$(CACHE_ENV) cmake -S "$(B)/$(SSH2)" -B "$(B)/$(SSH2)/build" $(CMAKE_FLAGS) \

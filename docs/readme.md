@@ -80,6 +80,13 @@ History-only applications can use `-lhistory` or the `history` pkg-config packag
 without ncurses. Both pkg-config files remain valid when the SDK moves.
 Readline retains its upstream GPLv3-or-later license in `share/licenses/readline/`.
 
+GLib **2.90.1** includes static GLib, GObject, GIO, GModule and GThread
+libraries. Use `pkg-config --static --cflags --libs gio-2.0` for GIO or
+`gio-unix-2.0` for its Unix-specific headers. GLib uses bundled PCRE2 **10.49**
+and libffi **3.8.1**, and GIO reuses zlib-ng for compression. The profile includes
+local I/O, sockets and GDBus. GIO TLS backends, desktop mount integration and
+runtime-loaded GModule plug-ins are outside the fully static profile.
+
 The SDK also includes Boost **1.92.0** headers, SQLite **3.54.1**, ZeroMQ
 **4.3.5**, libsodium **1.0.22**, GnuTLS **3.8.13**, target GMP **6.3.0** and
 Nettle/hogweed **3.10.2**. ZeroMQ includes CURVE encryption and secure WebSockets

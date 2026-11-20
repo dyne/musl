@@ -30,7 +30,10 @@ jobs:
           - target: riscv64-linux-musl
             suffix: riscv_64
     steps:
-      - uses: actions/checkout@v6
+      - name: Check out the smoke tests for the published release
+        uses: actions/checkout@v6
+        with:
+          ref: refs/tags/${{ inputs.release_tag }}
       - name: Check out the companion installer
         uses: actions/checkout@v6
         with:
