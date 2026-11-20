@@ -10,9 +10,30 @@ We enable bare-metal as well virtualized **builds of static binaries that run ev
 
 ## Usage
 
-Download and install in one line of shell:
+Run the install command for your target architecture.
+
+**x86_64**
+
+```sh
+curl -fL https://files.dyne.org/musl/dyne-gcc-musl-x86_64.tar.xz | sudo tar -C /opt -xJf -
 ```
-curl -L dl.dyne.org/musl | sudo tar -C /opt -xJf -
+
+**ARM hard-float (32-bit)**
+
+```sh
+curl -fL https://files.dyne.org/musl/dyne-gcc-musl-arm_hf.tar.xz | sudo tar -C /opt -xJf -
+```
+
+**AArch64 (ARM 64-bit)**
+
+```sh
+curl -fL https://files.dyne.org/musl/dyne-gcc-musl-arm_64.tar.xz | sudo tar -C /opt -xJf -
+```
+
+**RISC-V (64-bit)**
+
+```sh
+curl -fL https://files.dyne.org/musl/dyne-gcc-musl-riscv_64.tar.xz | sudo tar -C /opt -xJf -
 ```
 
 Or use the [dyne/musl-action](https://github.com/dyne/musl-action) in a github action:
