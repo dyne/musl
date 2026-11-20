@@ -237,7 +237,7 @@ available before accepting new pins.
 | libssh2 | https://libssh2.org/download/ |
 | ccache | https://github.com/ccache/ccache/releases |
 | ncurses | https://ftp.gnu.org/gnu/ncurses/ |
-| Readline / History | https://ftp.gnu.org/gnu/readline/ |
+| Readline / History | https://ftpmirror.gnu.org/readline/ |
 | GLib / GIO | https://download.gnome.org/sources/glib/ |
 | PCRE2 | https://github.com/PCRE2Project/pcre2/releases |
 | libffi | https://github.com/libffi/libffi/releases |
@@ -248,6 +248,10 @@ available before accepting new pins.
 | libsodium | https://github.com/jedisct1/libsodium/releases |
 | GnuTLS | https://www.gnutls.org/download.html |
 | Nettle (compatible 3.x) | https://ftp.gnu.org/gnu/nettle/ |
+
+Readline uses GNU's official mirror redirect. The direct GNU FTP host stalled
+while serving the archive to GitHub Actions runners. The mirror serves the
+same release archive, which the downloader checks against the pinned SHA-256.
 
 ### Repeatable upstream update procedure
 
