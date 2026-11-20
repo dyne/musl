@@ -175,6 +175,11 @@ libhistory.a and all public readline/ headers. It uses target ncursesw for
 terminal support; relocatable readline.pc exports -lncursesw for static links.
 history.pc needs no terminal library. Smoke tests exercise both packages
 separately as static PIE consumers. Preserve the upstream GPL license.
+GLib 2.90.1 builds GLib, GObject, GIO, GModule and GThread with host Meson.
+It uses PCRE2 10.49, libffi 3.8.1, bundled GVDB and target zlib-ng. The GIO
+profile omits TLS, libmount and SELinux integrations. Keep target pkg-config
+lookup isolated in the Meson cross file and retain static PIE smoke coverage
+for a regex, a generic GObject closure, gzip and a Unix stream.
 Kyoto disables zlib and respects selected compile flags instead of upstream's
 automatic -march=native/-O2 additions. Packaged ccache targets ARCH and is not a
 substitute for the x86_64 host ccache during cross-compilation.

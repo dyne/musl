@@ -91,6 +91,11 @@ SDK with its original prefix unavailable. Python 3 generates the test font;
 no system font package or desktop session is required.
 The [Dear ImGui consumer](imgui.md) additionally renders widgets and font-atlas
 pixels through SDL3's software backend, checking both installed package interfaces.
+The GLib/GIO smoke consumer uses relocatable `gio-unix-2.0` metadata and tests
+PCRE2 matching, a libffi-backed GObject closure, a zlib gzip round trip and
+a Unix input stream in the same static PIE executable. GLib requires host
+Meson 1.4 or newer. Its Meson cross build uses the selected target libraries
+and the GVDB sources bundled in the upstream GLib archive.
 
 For a quick library-only reproduction with an existing verified compiler:
 
@@ -233,6 +238,9 @@ available before accepting new pins.
 | ccache | https://github.com/ccache/ccache/releases |
 | ncurses | https://ftp.gnu.org/gnu/ncurses/ |
 | Readline / History | https://ftp.gnu.org/gnu/readline/ |
+| GLib / GIO | https://download.gnome.org/sources/glib/ |
+| PCRE2 | https://github.com/PCRE2Project/pcre2/releases |
+| libffi | https://github.com/libffi/libffi/releases |
 | Kyoto Cabinet | https://dbmx.net/kyotocabinet/pkg/ |
 | Boost headers | https://www.boost.org/releases/latest/ |
 | SQLite | https://sqlite.org/download.html |

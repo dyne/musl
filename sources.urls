@@ -26,3 +26,6 @@ SDL3_ttf-3.2.2.tar.gz https://github.com/libsdl-org/SDL_ttf/releases/download/re
 freetype-2.15.0.tar.xz https://download.savannah.gnu.org/releases/freetype/freetype-2.15.0.tar.xz
 harfbuzz-15.0.0.tar.xz https://github.com/harfbuzz/harfbuzz/releases/download/15.0.0/harfbuzz-15.0.0.tar.xz
 imgui-1.93.0.tar.gz https://github.com/ocornut/imgui/archive/refs/tags/v1.93.0.tar.gz
+libffi-3.8.1.tar.gz https://github.com/libffi/libffi/releases/download/v3.8.1/libffi-3.8.1.tar.gz
+pcre2-10.49.tar.gz https://github.com/PCRE2Project/pcre2/releases/download/pcre2-10.49/pcre2-10.49.tar.gz
+glib-2.90.1.tar.xz https://download.gnome.org/sources/glib/2.90/glib-2.90.1.tar.xz
