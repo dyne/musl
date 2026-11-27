@@ -129,16 +129,30 @@ jobs:
             sudo chown -R "$(id -u):$(id -g)" "$CCACHE_DIR"
           fi
           exit "$status"
+      - name: Stage configure logs for artifact upload
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p test-results/configure
+          roots=()
+          for directory in build/libs gcc-musl/build; do
+            if [[ -d $directory ]]; then
+              roots+=("$directory")
+            fi
+          done
+          if ((${#roots[@]})); then
+            # Alpine builds can leave root-only directories in upstream trees.
+            sudo find "${roots[@]}" -type f \( -name config.log -o -name CMakeConfigureLog.yaml \) -print0 |
+              sudo tar --null -T - -cf - |
+              tar -xf - -C test-results/configure
+          fi
       - name: Retain diagnostic evidence on success and failure
         if: always()
         uses: actions/upload-artifact@v6
         with:
           name: logs-${{ matrix.output }}
-          path: |
-            test-results/
-            build/libs/**/config.log
-            build/libs/**/CMakeConfigureLog.yaml
-            gcc-musl/build/**/config.log
+          path: test-results/
           if-no-files-found: warn
           retention-days: 90
 
