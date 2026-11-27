@@ -83,7 +83,8 @@ The static PIE UUID consumer uses `uuid` pkg-config metadata to resolve
 The [headless media checks](ffmpeg.md) rasterise SVG shapes and text with a
 generated font, emit PNG, collect a C++ backtrace, and open the ALSA null PCM
 using only the static SDK. Fontconfig's build requires host gperf and
-Meson 1.11 or newer.
+Meson 1.11 or newer. The Alpine build uses GNU tar to extract the pinned
+Rust archives, which use an XZ dictionary larger than BusyBox tar supports.
 It also discovers installed Boost/SQLite/ZeroMQ packages through CMake, links
 GnuTLS and libsodium statically, and exercises CURVE and certificate-verified
 WSS on native x86_64. See [the dependency profile and update procedure](bitcoin.md). Native
