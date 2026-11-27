@@ -68,10 +68,9 @@ $(MEDIA_CROSS): $(B)/config
 	} > "$@"
 
 MEDIA_ENV = $(CACHE_ENV) env CFLAGS="$(CFLAGS)" CXXFLAGS="$(CXXFLAGS)" LDFLAGS="$(LDFLAGS) -L$(T)/lib"
-# The unprepared compiler sysroot still contains shared libraries alongside archives.
 media-setup = meson setup "$(B)/$(1)/build" "$(B)/$(1)" --cross-file "$(MEDIA_CROSS)" \
 	--prefix "$(T)" --libdir lib --buildtype release --default-library static --wrap-mode nodownload \
-	-Dprefer_static=true -Db_staticpic=true -Dpkgconfig.relocatable=true
+	-Db_staticpic=true -Dpkgconfig.relocatable=true
 
 define media-install
 $(CACHE_ENV) meson compile -C "$(B)/$(1)/build" -j $(JOBS)
@@ -132,10 +131,11 @@ $(CAIRO_OUTPUTS) &: $(B)/$(CAIRO)/.extracted $(MEDIA_CROSS) $(PIXMAN_OUTPUTS) $(
 	install -dm755 "$(T)/share/licenses/cairo"
 	install -m644 "$(B)/$(CAIRO)"/COPYING* "$(T)/share/licenses/cairo/"
 
+# Pango's tools link statically while the unprepared sysroot still contains libatomic.so.
 $(PANGO_OUTPUTS) &: $(B)/$(PANGO)/.extracted $(MEDIA_CROSS) $(CAIRO_OUTPUTS) $(FONTCONFIG_OUTPUTS) \
 	$(FREETYPE_OUTPUTS) $(FRIBIDI_OUTPUTS) $(HARFBUZZ_OUTPUTS) $(GLIB_OUTPUTS)
 	$(MEDIA_ENV) $(call media-setup,$(PANGO)) \
-		-Dcairo=enabled -Dfontconfig=enabled -Dfreetype=enabled -Dlibthai=disabled -Dxft=disabled \
+		-Dprefer_static=true -Dcairo=enabled -Dfontconfig=enabled -Dfreetype=enabled -Dlibthai=disabled -Dxft=disabled \
 		-Dintrospection=disabled -Dbuild-testsuite=false -Dbuild-examples=false
 	$(call media-install,$(PANGO))
 	install -Dm644 "$(B)/$(PANGO)/COPYING" "$(T)/share/licenses/pango/COPYING"
