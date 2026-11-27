@@ -78,6 +78,8 @@ wide ncurses, plus C++20/thread/atomic/Kyoto Cabinet code. Separate Readline and
 History pkg-config consumers check line input, history expansion and static-PIE
 linking, including History without Readline/ncurses. It checks ELF machine
 identity and absence of dynamic dependencies, including packaged ccache.
+The static PIE UUID consumer uses `uuid` pkg-config metadata to resolve
+`<uuid.h>` and checks that a generated UUID survives a text round trip.
 It also discovers installed Boost/SQLite/ZeroMQ packages through CMake, links
 GnuTLS and libsodium statically, and exercises CURVE and certificate-verified
 WSS on native x86_64. See [the dependency profile and update procedure](bitcoin.md). Native
@@ -238,6 +240,7 @@ available before accepting new pins.
 | ccache | https://github.com/ccache/ccache/releases |
 | ncurses | https://ftp.gnu.org/gnu/ncurses/ |
 | Readline / History | https://ftpmirror.gnu.org/readline/ |
+| libuuid | https://www.kernel.org/pub/linux/utils/util-linux/ |
 | GLib / GIO | https://download.gnome.org/sources/glib/ |
 | PCRE2 | https://github.com/PCRE2Project/pcre2/releases |
 | libffi | https://github.com/libffi/libffi/releases |

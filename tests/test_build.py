@@ -161,7 +161,7 @@ class LibraryBuilds(Workspace):
         cache = self.work / ".cache/sources"
         cache.mkdir(parents=True)
         recipe = (ROOT / "libs/GNUmakefile").read_text()
-        packages = dict(re.findall(r"^(LIBSSL|ZLIB|CURL|SSH2|CCACHE|NCURSES|READLINE|KYOTOCAB|BOOST|SQLITE|ZMQ|GMP|NETTLE|GNUTLS|SODIUM|SDL|SDLIMAGE|SDLTTF|FREETYPE|HARFBUZZ|IMGUI|LIBFFI|PCRE2|GLIB) \?= (\S+)$",
+        packages = dict(re.findall(r"^(LIBSSL|ZLIB|CURL|SSH2|CCACHE|NCURSES|READLINE|KYOTOCAB|BOOST|SQLITE|ZMQ|GMP|NETTLE|GNUTLS|SODIUM|SDL|SDLIMAGE|SDLTTF|FREETYPE|HARFBUZZ|IMGUI|LIBFFI|PCRE2|GLIB|LIBUUID) \?= (\S+)$",
                                    recipe, re.MULTILINE))
         self.package_count = len(packages)
         archives = [packages[key] + suffix for key, suffix in
@@ -172,7 +172,8 @@ class LibraryBuilds(Workspace):
                      ("GNUTLS", ".tar.xz"), ("SODIUM", ".tar.gz"), ("SDL", ".tar.gz"),
                      ("SDLIMAGE", ".tar.gz"), ("SDLTTF", ".tar.gz"), ("FREETYPE", ".tar.xz"),
                      ("HARFBUZZ", ".tar.xz"), ("IMGUI", ".tar.gz"), ("READLINE", ".tar.gz"),
-                     ("LIBFFI", ".tar.gz"), ("PCRE2", ".tar.gz"), ("GLIB", ".tar.xz")]]
+                     ("LIBFFI", ".tar.gz"), ("PCRE2", ".tar.gz"), ("GLIB", ".tar.xz"),
+                     ("LIBUUID", ".tar.xz")]]
         shutil.copytree(ROOT / "libs/patches", self.work / "libs/patches")
         shutil.copytree(ROOT / "libs/cmake", self.work / "libs/cmake")
         self.ssl_package = packages["LIBSSL"]
@@ -208,7 +209,7 @@ class LibraryBuilds(Workspace):
                                ("ZMQ", "zmq"), ("SDL", "sdl"), ("SDLIMAGE", "sdlimage"),
                                ("SDLTTF", "sdlttf"), ("FREETYPE", "freetype"), ("HARFBUZZ", "harfbuzz"),
                                ("IMGUI", "imgui"), ("READLINE", "readline"), ("LIBFFI", "ffi"),
-                               ("PCRE2", "pcre2"), ("GLIB", "glib")]:
+                               ("PCRE2", "pcre2"), ("GLIB", "glib"), ("LIBUUID", "uuid")]:
             recipe += f'\n$({variable}_OUTPUTS) &:\n'
             recipe += f'\t@for output in $({variable}_OUTPUTS); do mkdir -p "$$(dirname "$$output")"; touch "$$output"; done\n'
             recipe += f'\t@echo {name} >> "$(T)/order"\n'
@@ -231,7 +232,7 @@ class LibraryBuilds(Workspace):
         self.assertEqual(set(first), {"ssl", "z", "ssh", "curl", "ncurses", "kyoto", "ccache",
                                       "boost", "sqlite", "gmp", "nettle", "gnutls", "sodium", "zmq",
                                       "sdl", "sdlimage", "sdlttf", "freetype", "harfbuzz", "imgui", "readline",
-                                      "ffi", "pcre2", "glib"})
+                                      "ffi", "pcre2", "glib", "uuid"})
         self.assertLess(first.index("ssl"), first.index("ssh"))
         self.assertLess(first.index("ssh"), first.index("curl"))
         for dependency, dependent in [("gmp", "nettle"), ("nettle", "gnutls"),
@@ -371,6 +372,16 @@ class LibraryBuilds(Workspace):
                 (self.target / output).unlink()
                 self.make("libs")
                 self.assertEqual(self.order()[before:], rebuilt)
+                self.assertTrue((self.target / output).is_file())
+
+    def test_missing_uuid_outputs_reinstall_together(self):
+        self.make("libs")
+        for output in ["lib/libuuid.a", "include/uuid/uuid.h", "lib/pkgconfig/uuid.pc"]:
+            with self.subTest(output=output):
+                before = len(self.order())
+                (self.target / output).unlink()
+                self.make("libs")
+                self.assertEqual(self.order()[before:], ["uuid"])
                 self.assertTrue((self.target / output).is_file())
 
 
