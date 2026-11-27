@@ -51,6 +51,7 @@ LIBFFI ?= libffi-3.8.1
 PCRE2 ?= pcre2-10.49
 GLIB ?= glib-2.90.1
 LIBUUID ?= util-linux-2.42.4
+LIBMAGIC ?= file-5.48
 BOOST_VERSION := $(patsubst boost-%,%,$(BOOST))
 ZMQ_PATCHES := $(sort $(wildcard patches/$(ZMQ)/*.patch))
 HARFBUZZ_PATCHES := $(sort $(wildcard patches/$(HARFBUZZ)/*.patch))
@@ -58,11 +59,11 @@ READLINE_PATCHES := $(sort $(wildcard patches/$(READLINE)/*.patch))
 LIBRARY_PATCHES := $(ZMQ_PATCHES) $(HARFBUZZ_PATCHES) $(READLINE_PATCHES)
 PACKAGE_CMAKE := $(sort $(wildcard cmake/*.cmake cmake/imgui/*))
 
-PACKAGES := $(LIBSSL) $(ZLIB) $(CURL) $(SSH2) $(CCACHE) $(NCURSES) $(READLINE) $(KYOTOCAB) $(BOOST) $(SQLITE) $(GMP) $(NETTLE) $(GNUTLS) $(SODIUM) $(ZMQ) $(SDL) $(SDLIMAGE) $(SDLTTF) $(FREETYPE) $(HARFBUZZ) $(IMGUI) $(LIBFFI) $(PCRE2) $(GLIB) $(LIBUUID)
+PACKAGES := $(LIBSSL) $(ZLIB) $(CURL) $(SSH2) $(CCACHE) $(NCURSES) $(READLINE) $(KYOTOCAB) $(BOOST) $(SQLITE) $(GMP) $(NETTLE) $(GNUTLS) $(SODIUM) $(ZMQ) $(SDL) $(SDLIMAGE) $(SDLTTF) $(FREETYPE) $(HARFBUZZ) $(IMGUI) $(LIBFFI) $(PCRE2) $(GLIB) $(LIBUUID) $(LIBMAGIC)
 ARCHIVES := $(LIBSSL).tar.gz $(ZLIB).tar.gz $(CURL).tar.xz $(SSH2).tar.xz $(CCACHE).tar.xz $(NCURSES).tar.gz $(KYOTOCAB).tar.gz \
 	$(BOOST).tar.xz $(SQLITE).tar.gz $(GMP).tar.xz $(NETTLE).tar.gz $(GNUTLS).tar.xz $(SODIUM).tar.gz $(ZMQ).tar.gz \
 	$(SDL).tar.gz $(SDLIMAGE).tar.gz $(SDLTTF).tar.gz $(FREETYPE).tar.xz $(HARFBUZZ).tar.xz $(IMGUI).tar.gz $(READLINE).tar.gz \
-	$(LIBFFI).tar.gz $(PCRE2).tar.gz $(GLIB).tar.xz $(LIBUUID).tar.xz
+	$(LIBFFI).tar.gz $(PCRE2).tar.gz $(GLIB).tar.xz $(LIBUUID).tar.xz $(LIBMAGIC).tar.gz
 READLINE_OUTPUTS := $(T)/lib/libreadline.a $(T)/lib/libhistory.a \
 	$(addprefix $(T)/include/readline/,readline.h history.h keymaps.h chardefs.h tilde.h rlstdc.h rlconf.h rltypedefs.h) \
 	$(T)/lib/pkgconfig/readline.pc $(T)/lib/pkgconfig/history.pc
@@ -101,11 +102,16 @@ GLIB_OUTPUTS := $(addprefix $(T)/lib/lib,$(addsuffix -2.0.a,glib gobject gmodule
 	$(T)/share/licenses/glib/COPYING $(T)/share/licenses/glib/gvdb/COPYING
 LIBUUID_OUTPUTS := $(T)/lib/libuuid.a $(T)/include/uuid/uuid.h $(T)/lib/pkgconfig/uuid.pc \
 	$(T)/share/licenses/libuuid/COPYING $(T)/share/licenses/libuuid/COPYING.BSD-3-Clause
+LIBMAGIC_DIR := $(B)/$(LIBMAGIC)
+LIBMAGIC_OUTPUTS := $(T)/lib/libmagic.a $(T)/include/magic.h $(T)/lib/pkgconfig/libmagic.pc \
+	$(T)/share/misc/magic.mgc $(T)/share/licenses/libmagic/COPYING
+LIBMAGIC_FLAGS := --disable-shared --enable-static --disable-bzlib --disable-xzlib \
+	--disable-zstdlib --disable-lzlib --disable-libseccomp --disable-landlock
 OUTPUTS := $(T)/lib/libssl.a $(T)/lib/libcrypto.a $(T)/lib/libz.a \
 	$(T)/lib/libcurl.a $(T)/lib/libssh2.a $(T)/lib/libncursesw.a \
 	$(T)/lib/libkyotocabinet.a $(T)/bin/ccache $(BOOST_OUTPUTS) $(SQLITE_OUTPUTS) $(GMP_OUTPUTS) $(NETTLE_OUTPUTS) $(GNUTLS_OUTPUTS) $(SODIUM_OUTPUTS) $(ZMQ_OUTPUTS) \
 	$(SDL_OUTPUTS) $(SDLIMAGE_OUTPUTS) $(SDLTTF_OUTPUTS) $(FREETYPE_OUTPUTS) $(HARFBUZZ_OUTPUTS) $(IMGUI_OUTPUTS) $(READLINE_OUTPUTS) \
-	$(LIBFFI_OUTPUTS) $(PCRE2_OUTPUTS) $(GLIB_OUTPUTS) $(LIBUUID_OUTPUTS)
+	$(LIBFFI_OUTPUTS) $(PCRE2_OUTPUTS) $(GLIB_OUTPUTS) $(LIBUUID_OUTPUTS) $(LIBMAGIC_OUTPUTS)
 CACHE_ENV = sh "$(R)/scripts/compiler-cache.sh" "$(CCACHE_LAUNCHER)" "$(TOOLCHAIN)/bin/$(ARCH)-gcc"
 comma := ,
 MESON_LAUNCHER = $(if $(CCACHE_LAUNCHER),'$(CCACHE_LAUNCHER)'$(comma))
@@ -206,6 +212,32 @@ $(LIBUUID_OUTPUTS) &: $(B)/$(LIBUUID)/.extracted
 	install -Dm644 "$(B)/$(LIBUUID)/libuuid/COPYING" "$(T)/share/licenses/libuuid/COPYING"
 	install -Dm644 "$(B)/$(LIBUUID)/Documentation/licenses/COPYING.BSD-3-Clause" \
 		"$(T)/share/licenses/libuuid/COPYING.BSD-3-Clause"
+
+# Compile the database with a native file binary from the same pinned release.
+$(LIBMAGIC_DIR)/host/magic/magic.mgc: $(LIBMAGIC_DIR)/.extracted
+	mkdir -p "$(LIBMAGIC_DIR)/host"
+	cd "$(LIBMAGIC_DIR)/host" && env CC=cc CFLAGS=-O2 CPPFLAGS='' LDFLAGS='' LIBS='' \
+		../configure $(LIBMAGIC_FLAGS) --disable-zlib
+	$(MAKE) -C "$(LIBMAGIC_DIR)/host/src" -j$(JOBS)
+	$(MAKE) -C "$(LIBMAGIC_DIR)/host/magic" magic.mgc
+
+$(LIBMAGIC_OUTPUTS) &: $(LIBMAGIC_DIR)/host/magic/magic.mgc $(T)/lib/libz.a
+	mkdir -p "$(LIBMAGIC_DIR)/target"
+	cd "$(LIBMAGIC_DIR)/target" && $(AUTOCONF_ENV) CFLAGS="$(CFLAGS) -fPIC" CPPFLAGS="-I$(T)/include" \
+		LDFLAGS="$(LDFLAGS) -L$(T)/lib" LIBS=-lm \
+		../configure --prefix="$(T)" --datadir=/usr/share --build=x86_64-linux-musl --host=$(ARCH) \
+		$(LIBMAGIC_FLAGS) --enable-zlib --with-pic
+	$(CACHE_ENV) $(MAKE) -C "$(LIBMAGIC_DIR)/target/src" magic.h
+	$(CACHE_ENV) $(MAKE) -C "$(LIBMAGIC_DIR)/target/src" -j$(JOBS) libmagic.la
+	install -Dm644 "$(LIBMAGIC_DIR)/target/src/.libs/libmagic.a" "$(T)/lib/libmagic.a"
+	install -Dm644 "$(LIBMAGIC_DIR)/target/src/magic.h" "$(T)/include/magic.h"
+	install -Dm644 "$(LIBMAGIC_DIR)/target/libmagic.pc" "$(T)/lib/pkgconfig/libmagic.pc"
+	sed -i -e 's|^prefix=.*|prefix=$${pcfiledir}/../..|' \
+		-e 's|^exec_prefix=.*|exec_prefix=$${prefix}|' -e 's|^libdir=.*|libdir=$${prefix}/lib|' \
+		-e 's|^includedir=.*|includedir=$${prefix}/include|' \
+		-e '/^includedir=/a\magic_database=$${prefix}/share/misc/magic.mgc' "$(T)/lib/pkgconfig/libmagic.pc"
+	install -Dm644 "$(LIBMAGIC_DIR)/host/magic/magic.mgc" "$(T)/share/misc/magic.mgc"
+	install -Dm644 "$(LIBMAGIC_DIR)/COPYING" "$(T)/share/licenses/libmagic/COPYING"
 
 # Keep host tools native and limit Meson's target pkg-config lookup to this prefix.
 $(GLIB_OUTPUTS) &: $(B)/$(GLIB)/.extracted $(LIBFFI_OUTPUTS) $(PCRE2_OUTPUTS) $(T)/lib/libz.a

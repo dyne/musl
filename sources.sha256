@@ -49,3 +49,4 @@ ecc53a3c49fab5ab8c9301b3bbc8fb1dff9be6c65287add3f57a0fe8fddfea9e  cargo-1.96.1-x
 e2aa342bf2f4f61ee41e8c1546585e0f630a0ca8bb26dd8ade51f23e07ee66ea  rust-std-1.96.1-arm-unknown-linux-musleabihf.tar.xz
 7be3628e9cc73eec5e6d4ddfad5773d64a5c4707915ba0a045f28eb6cdadee52  rust-std-1.96.1-riscv64gc-unknown-linux-musl.tar.xz
 debde8114216946e3f48cd8ec0c92e79734ec728baacd73e99d2889b56f18b3b  cargo-c-0.10.28-x86_64-unknown-linux-musl.tar.gz
+ed14656883b23a364b4057c05595d93252da9bc473d30106519519d0da141283  file-5.48.tar.gz

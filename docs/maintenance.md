@@ -80,6 +80,9 @@ linking, including History without Readline/ncurses. It checks ELF machine
 identity and absence of dynamic dependencies, including packaged ccache.
 The static PIE UUID consumer uses `uuid` pkg-config metadata to resolve
 `<uuid.h>` and checks that a generated UUID survives a text round trip.
+The libmagic smoke consumer finds the packaged database through pkg-config
+and identifies a gzip-compressed GIF in memory. A native `file` binary from
+the pinned release compiles the database during the SDK build.
 The [headless media checks](ffmpeg.md) rasterise SVG shapes and text with a
 generated font, emit PNG, collect a C++ backtrace, and open the ALSA null PCM
 using only the static SDK. Fontconfig's build requires host gperf and
@@ -246,6 +249,7 @@ available before accepting new pins.
 | ncurses | https://ftp.gnu.org/gnu/ncurses/ |
 | Readline / History | https://ftpmirror.gnu.org/readline/ |
 | libuuid | https://www.kernel.org/pub/linux/utils/util-linux/ |
+| libmagic | https://www.astron.com/pub/file/ |
 | GLib / GIO | https://download.gnome.org/sources/glib/ |
 | PCRE2 | https://github.com/PCRE2Project/pcre2/releases |
 | libffi | https://github.com/libffi/libffi/releases |

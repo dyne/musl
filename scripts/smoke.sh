@@ -52,12 +52,17 @@ cmake -S tests/uuid -B "$build/uuid" \
     -DCMAKE_TOOLCHAIN_FILE="$PWD/settings.cmake" -DARCH="$arch" \
     -DTOOLCHAIN_PREFIX="$compiler" -DTARGET_PREFIX="$target" -DCCACHE=OFF -DFORCE_STATIC=ON
 cmake --build "$build/uuid" --parallel 2
+cmake -S tests/magic -B "$build/magic" \
+    -DCMAKE_TOOLCHAIN_FILE="$PWD/settings.cmake" -DARCH="$arch" \
+    -DTOOLCHAIN_PREFIX="$compiler" -DTARGET_PREFIX="$target" -DCCACHE=OFF -DFORCE_STATIC=ON
+cmake --build "$build/magic" --parallel 2
 cmake -S tests/media -B "$build/media" \
     -DCMAKE_TOOLCHAIN_FILE="$PWD/settings.cmake" -DARCH="$arch" \
     -DTOOLCHAIN_PREFIX="$compiler" -DTARGET_PREFIX="$target" -DCCACHE=OFF -DFORCE_STATIC=ON
 cmake --build "$build/media" --parallel 2
 for binary in "$build/toolchain" "$build/static-pie" "$build/static-and-pie" \
-    "$build/c" "$build/cpp" "$build/uuid/uuid-smoke" "$build/dependencies/dependencies" "$build/dependencies/pkgconfig" \
+    "$build/c" "$build/cpp" "$build/uuid/uuid-smoke" "$build/magic/magic-smoke" \
+    "$build/dependencies/dependencies" "$build/dependencies/pkgconfig" \
     "$build/dependencies/avena-dependencies" "$build/sdl/sdl" "$build/sdl/sdl-pkgconfig" \
     "$build/curl/curl-pkgconfig" "$build/curl/curl-config" \
     "$build/imgui/imgui" "$build/imgui/imgui-pkgconfig" \
@@ -73,7 +78,7 @@ for binary in "$build/toolchain" "$build/static-pie" "$build/static-and-pie" \
         exit 1
     fi
 done
-for binary in "$build/static-pie" "$build/static-and-pie" "$build/uuid/uuid-smoke" \
+for binary in "$build/static-pie" "$build/static-and-pie" "$build/uuid/uuid-smoke" "$build/magic/magic-smoke" \
     "$build/dependencies/dependencies" "$build/dependencies/pkgconfig" "$build/sdl/sdl" "$build/sdl/sdl-pkgconfig" \
     "$build/imgui/imgui" "$build/imgui/imgui-pkgconfig" \
     "$build/readline/readline" "$build/readline/history" "$build/glib/glib-smoke" \
@@ -91,6 +96,7 @@ if [[ $arch == x86_64-linux-musl && $(uname -m) == x86_64 ]]; then
     "$build/c"
     "$build/cpp"
     "$build/uuid/uuid-smoke"
+    ctest --test-dir "$build/magic" --output-on-failure
     "$build/dependencies/dependencies"
     "$build/dependencies/pkgconfig"
     "$build/dependencies/avena-dependencies"
