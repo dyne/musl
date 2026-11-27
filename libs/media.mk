@@ -68,9 +68,10 @@ $(MEDIA_CROSS): $(B)/config
 	} > "$@"
 
 MEDIA_ENV = $(CACHE_ENV) env CFLAGS="$(CFLAGS)" CXXFLAGS="$(CXXFLAGS)" LDFLAGS="$(LDFLAGS) -L$(T)/lib"
+# The unprepared compiler sysroot still contains shared libraries alongside archives.
 media-setup = meson setup "$(B)/$(1)/build" "$(B)/$(1)" --cross-file "$(MEDIA_CROSS)" \
 	--prefix "$(T)" --libdir lib --buildtype release --default-library static --wrap-mode nodownload \
-	-Db_staticpic=true -Dpkgconfig.relocatable=true
+	-Dprefer_static=true -Db_staticpic=true -Dpkgconfig.relocatable=true
 
 define media-install
 $(CACHE_ENV) meson compile -C "$(B)/$(1)/build" -j $(JOBS)
