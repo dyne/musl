@@ -105,6 +105,14 @@ util-linux **2.42.4** provides static `libuuid.a` and `<uuid/uuid.h>`. Use
 `pkg-config --static --cflags --libs uuid` for the compiler and linker flags,
 including the include path for projects that use `<uuid.h>`.
 
+File **5.48** provides static `libmagic.a`, `<magic.h>`, and the compiled
+`share/misc/magic.mgc` database. Link with
+`pkg-config --static --cflags --libs libmagic`. With pkg-config pointed at the
+SDK, use `pkg-config --variable=magic_database libmagic` to locate the database.
+Pass that path to `magic_load()` or set the application's `MAGIC` environment
+variable to use it with `magic_load(cookie, NULL)`. The library uses the SDK's
+zlib for gzip input.
+
 The [headless SVG and FFmpeg profile](ffmpeg.md) includes static librsvg,
 Cairo with PNG and GObject support, Pixman, libpng, Pango with PangoCairo and
 PangoFT2, Fontconfig, FriBidi, and libxml2. The SDK also includes ALSA and

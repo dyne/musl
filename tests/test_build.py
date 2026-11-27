@@ -208,12 +208,13 @@ class LibraryBuilds(Workspace):
         recipe += '\n$(B)/$(READLINE)/.patched:\n\t@touch "$@"\n'
         recipe += '\n$(B)/$(RSVG)/.patched:\n\t@touch "$@"\n'
         recipe += '\n$(RUST_STAMP):\n\t@mkdir -p "$(RUST_DIR)"\n\t@touch "$@"\n'
+        recipe += '\n$(LIBMAGIC_DIR)/host/magic/magic.mgc:\n\t@mkdir -p "$(dir $@)"\n\t@touch "$@"\n'
         for variable, name in [("BOOST", "boost"), ("SQLITE", "sqlite"), ("GMP", "gmp"),
                                ("NETTLE", "nettle"), ("GNUTLS", "gnutls"), ("SODIUM", "sodium"),
                                ("ZMQ", "zmq"), ("SDL", "sdl"), ("SDLIMAGE", "sdlimage"),
                                ("SDLTTF", "sdlttf"), ("FREETYPE", "freetype"), ("HARFBUZZ", "harfbuzz"),
                                ("IMGUI", "imgui"), ("READLINE", "readline"), ("LIBFFI", "ffi"),
-                               ("PCRE2", "pcre2"), ("GLIB", "glib"), ("LIBUUID", "uuid"),
+                               ("PCRE2", "pcre2"), ("GLIB", "glib"), ("LIBUUID", "uuid"), ("LIBMAGIC", "magic"),
                                ("EXECINFO", "execinfo"), ("PIXMAN", "pixman"), ("LIBPNG", "png"),
                                ("LIBXML2", "xml"), ("FONTCONFIG", "fontconfig"), ("FRIBIDI", "fribidi"),
                                ("CAIRO", "cairo"), ("PANGO", "pango"), ("RSVG", "rsvg"), ("ALSA", "alsa")]:
@@ -240,7 +241,7 @@ class LibraryBuilds(Workspace):
                                       "boost", "sqlite", "gmp", "nettle", "gnutls", "sodium", "zmq",
                                       "sdl", "sdlimage", "sdlttf", "freetype", "harfbuzz", "imgui", "readline",
                                       "ffi", "pcre2", "glib", "uuid", "execinfo", "pixman", "png", "xml",
-                                      "fontconfig", "fribidi", "cairo", "pango", "rsvg", "alsa", "unwind"})
+                                      "fontconfig", "fribidi", "cairo", "pango", "rsvg", "alsa", "unwind", "magic"})
         self.assertLess(first.index("ssl"), first.index("ssh"))
         self.assertLess(first.index("ssh"), first.index("curl"))
         for dependency, dependent in [("gmp", "nettle"), ("nettle", "gnutls"),
@@ -248,7 +249,7 @@ class LibraryBuilds(Workspace):
                                       ("sdl", "sdlimage"), ("sdl", "sdlttf"), ("z", "freetype"),
                                       ("freetype", "harfbuzz"), ("harfbuzz", "sdlttf"), ("sdl", "imgui"),
                                       ("ncurses", "readline"), ("ffi", "glib"), ("pcre2", "glib"),
-                                      ("z", "glib"), ("z", "png"), ("xml", "fontconfig"),
+                                      ("z", "glib"), ("z", "png"), ("z", "magic"), ("xml", "fontconfig"),
                                       ("pixman", "cairo"), ("png", "cairo"), ("fontconfig", "cairo"),
                                       ("cairo", "pango"), ("fribidi", "pango"), ("pango", "rsvg"),
                                       ("unwind", "rsvg")]:
@@ -409,6 +410,15 @@ class LibraryBuilds(Workspace):
                 self.make("libs")
                 self.assertEqual(self.order()[before:], ["uuid"])
                 self.assertTrue((self.target / output).is_file())
+
+    def test_missing_magic_database_reinstalls_libmagic(self):
+        self.make("libs")
+        database = self.target / "share/misc/magic.mgc"
+        database.unlink()
+        before = len(self.order())
+        self.make("libs")
+        self.assertEqual(self.order()[before:], ["magic"])
+        self.assertTrue(database.is_file())
 
 
 class ToolchainState(Workspace):

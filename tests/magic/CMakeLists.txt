@@ -1,0 +1,20 @@
+cmake_minimum_required(VERSION 3.22)
+project(DyneMagicConsumer LANGUAGES C)
+
+include("${CMAKE_CURRENT_LIST_DIR}/../cmake/RequireStaticPIE.cmake")
+dyne_require_static_pie()
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+find_package(PkgConfig REQUIRED)
+list(APPEND PKG_CONFIG_ARGN --dont-define-prefix --static)
+pkg_check_modules(MAGIC REQUIRED IMPORTED_TARGET libmagic)
+pkg_get_variable(MAGIC_DATABASE libmagic magic_database)
+if(NOT EXISTS "${MAGIC_DATABASE}")
+  message(FATAL_ERROR "Missing libmagic database at ${MAGIC_DATABASE}")
+endif()
+add_executable(magic-smoke main.c)
+target_link_libraries(magic-smoke PRIVATE PkgConfig::MAGIC)
+
+enable_testing()
+add_test(NAME magic-buffer COMMAND magic-smoke "${MAGIC_DATABASE}")
+set_tests_properties(magic-buffer PROPERTIES ENVIRONMENT "PATH=")

@@ -52,6 +52,9 @@ def check(arch, archive):
                     ["execinfo", "librsvg-2.0", "cairo", "cairo-gobject", "cairo-png", "pixman-1",
                      "libpng", "pango", "pangocairo", "pangoft2", "fontconfig", "fribidi", "libxml-2.0", "alsa"])
     required.update({target + "/etc/fonts/fonts.conf", target + "/share/alsa/alsa.conf"})
+    required.update(target + "/" + path for path in
+                    ["lib/libmagic.a", "include/magic.h", "lib/pkgconfig/libmagic.pc",
+                     "share/misc/magic.mgc", "share/licenses/libmagic/COPYING"])
     required.update(target + "/share/licenses/" + license for license in
                     ["boost/LICENSE_1_0.txt", "zeromq/LICENSE", "libsodium/LICENSE",
                      "gmp/COPYING", "nettle/COPYING.LESSERv3", "gnutls/COPYING.LESSERv2",
