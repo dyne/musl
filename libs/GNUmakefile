@@ -118,6 +118,8 @@ CMAKE_FLAGS = -G Ninja -DARCH=$(ARCH) -DROOT="$(R)" -DTARGET_PREFIX="$(T)" \
 	-DCMAKE_CXX_FLAGS="$(CXXFLAGS) -static" -DFORCE_STATIC=ON \
 	-DCCACHE=$(if $(CCACHE_LAUNCHER),ON,OFF)
 
+include media.mk
+
 .PHONY: all fetch build clean FORCE
 # Verify every cached input before any extraction or compilation starts.
 all: build
@@ -129,9 +131,9 @@ build: $(OUTPUTS)
 
 $(B)/config: FORCE
 	@mkdir -p "$(B)"
-	@set -e; { $(foreach key,ARCH T TOOLCHAIN CC CXX AR RANLIB CFLAGS CXXFLAGS LDFLAGS PACKAGES CCACHE_LAUNCHER,printf '%s\n' '$(key)=$($(key))';) \
-		sha256sum GNUmakefile "$(R)/settings.cmake" "$(CHECKSUMS)" "$(TOOLCHAIN)/bin/$(ARCH)-gcc"; \
-		$(foreach input,$(LIBRARY_PATCHES) $(PACKAGE_CMAKE),sha256sum "$(input)";) \
+	@set -e; { $(foreach key,ARCH T TOOLCHAIN CC CXX AR RANLIB CFLAGS CXXFLAGS LDFLAGS PACKAGES ARCHIVES CCACHE_LAUNCHER,printf '%s\n' '$(key)=$($(key))';) \
+		sha256sum GNUmakefile media.mk "$(R)/settings.cmake" "$(CHECKSUMS)" "$(TOOLCHAIN)/bin/$(ARCH)-gcc"; \
+		$(foreach input,$(LIBRARY_PATCHES) $(PACKAGE_CMAKE) $(MEDIA_INPUTS),sha256sum "$(input)";) \
 		if test "$(TOOLCHAIN)" = "$(R)/dyne/gcc-musl" && test -f "$(R)/build/toolchain/$(ARCH)/config"; then \
 			sha256sum "$(R)/build/toolchain/$(ARCH)/config"; \
 		fi; \

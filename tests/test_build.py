@@ -127,6 +127,7 @@ class Downloads(Workspace):
         for directory, filename in [("gcc-musl", "Makefile"), ("libs", "GNUmakefile")]:
             (self.work / directory).mkdir()
             shutil.copy(ROOT / directory / filename, self.work / directory / filename)
+        shutil.copy(ROOT / "libs/media.mk", self.work / "libs")
         shutil.copytree(ROOT / "gcc-musl/hashes", self.work / "gcc-musl/hashes")
         shutil.copytree(ROOT / "scripts", self.work / "scripts")
         names = [line.split()[0] for line in (ROOT / "sources.urls").read_text().splitlines()]
@@ -138,15 +139,17 @@ class Downloads(Workspace):
         gcc_archive = next(name for name in names if name.startswith("gcc-"))
         self.ok(run("make", "-C", "gcc-musl", "sources/config.sub", "sources/" + gcc_archive,
                     "SOURCES_URL=" + base + "/missing", cwd=self.work))
-        for directory, target in [("gcc-musl", "fetch-sources"), ("libs", "fetch")]:
-            self.ok(run("make", "-C", directory, target, "SOURCES_URL=" + base + "/missing",
-                        cwd=self.work))
+        fetches = [("-C", "gcc-musl", "fetch-sources")]
+        fetches += [("-C", "libs", "fetch", "ARCH=" + arch, "RUST_HOST=x86_64-unknown-linux-musl")
+                    for arch in ("x86_64-linux-musl", "arm-linux-musleabihf", "riscv64-linux-musl", "aarch64-linux-musl")]
+        fetches.append(("-C", "libs", "fetch", "ARCH=x86_64-linux-musl", "RUST_HOST=x86_64-unknown-linux-gnu"))
+        for args in fetches:
+            self.ok(run("make", *args, "SOURCES_URL=" + base + "/missing", cwd=self.work))
         self.assertEqual(sorted(self.requests), sorted("/upstream/" + name for name in names + [next(n for n in names if n.startswith("gmp-"))]))
         self.assertEqual((self.work / "gcc-musl/sources/config.sub").read_bytes(), self.payload)
         before = list(self.requests)
-        for directory, target in [("gcc-musl", "fetch-sources"), ("libs", "fetch")]:
-            self.ok(run("make", "-C", directory, target, "SOURCES_URL=" + base + "/missing",
-                        cwd=self.work))
+        for args in fetches:
+            self.ok(run("make", *args, "SOURCES_URL=" + base + "/missing", cwd=self.work))
         self.assertEqual(self.requests, before)  # Verified local cache needs no network.
 
 
@@ -161,26 +164,24 @@ class LibraryBuilds(Workspace):
         cache = self.work / ".cache/sources"
         cache.mkdir(parents=True)
         recipe = (ROOT / "libs/GNUmakefile").read_text()
-        packages = dict(re.findall(r"^(LIBSSL|ZLIB|CURL|SSH2|CCACHE|NCURSES|READLINE|KYOTOCAB|BOOST|SQLITE|ZMQ|GMP|NETTLE|GNUTLS|SODIUM|SDL|SDLIMAGE|SDLTTF|FREETYPE|HARFBUZZ|IMGUI|LIBFFI|PCRE2|GLIB|LIBUUID) \?= (\S+)$",
-                                   recipe, re.MULTILINE))
-        self.package_count = len(packages)
-        archives = [packages[key] + suffix for key, suffix in
-                    [("LIBSSL", ".tar.gz"), ("ZLIB", ".tar.gz"), ("CURL", ".tar.xz"),
-                     ("SSH2", ".tar.xz"), ("CCACHE", ".tar.xz"), ("NCURSES", ".tar.gz"),
-                     ("KYOTOCAB", ".tar.gz"), ("BOOST", ".tar.xz"), ("SQLITE", ".tar.gz"),
-                     ("ZMQ", ".tar.gz"), ("GMP", ".tar.xz"), ("NETTLE", ".tar.gz"),
-                     ("GNUTLS", ".tar.xz"), ("SODIUM", ".tar.gz"), ("SDL", ".tar.gz"),
-                     ("SDLIMAGE", ".tar.gz"), ("SDLTTF", ".tar.gz"), ("FREETYPE", ".tar.xz"),
-                     ("HARFBUZZ", ".tar.xz"), ("IMGUI", ".tar.gz"), ("READLINE", ".tar.gz"),
-                     ("LIBFFI", ".tar.gz"), ("PCRE2", ".tar.gz"), ("GLIB", ".tar.xz"),
-                     ("LIBUUID", ".tar.xz")]]
+        shutil.copy(ROOT / "libs/GNUmakefile", self.work / "libs")
+        shutil.copy(ROOT / "libs/media.mk", self.work / "libs")
+        shutil.copytree(ROOT / "libs/execinfo", self.work / "libs/execinfo")
         shutil.copytree(ROOT / "libs/patches", self.work / "libs/patches")
         shutil.copytree(ROOT / "libs/cmake", self.work / "libs/cmake")
-        self.ssl_package = packages["LIBSSL"]
-        self.curl_archive = packages["CURL"] + ".tar.xz"
+        query = self.work / "fixture.mk"
+        query.write_text('fixture-inputs:\n\t@printf "%s\\n" "$(LIBSSL)" "$(CURL).tar.xz" "$(PACKAGES)" "$(ARCHIVES)"\n')
+        archives = set()
+        for arch in ("x86_64-linux-musl", "arm-linux-musleabihf"):
+            inputs = self.ok(run("make", "-s", "-C", "libs", "-f", "GNUmakefile", "-f", str(query),
+                                 "fixture-inputs", "ARCH=" + arch, cwd=self.work)).stdout.splitlines()
+            self.ssl_package, self.curl_archive, packages, archive_list = inputs
+            self.package_count = len(packages.split()) + 2  # execinfo and Rust's libunwind
+            archives.update(archive_list.split())
         manifest = []
-        for name in archives:
-            with tarfile.open(cache / name, "w:gz" if name.endswith(".gz") else "w:xz") as archive:
+        for name in sorted(archives):
+            compression = name.rsplit(".", 1)[1]
+            with tarfile.open(cache / name, "w:" + compression) as archive:
                 content = b"source fixture\n"
                 member = tarfile.TarInfo(name.split(".tar.")[0] + "/input")
                 member.size = len(content)
@@ -196,7 +197,8 @@ class LibraryBuilds(Workspace):
         recipe += '\t@echo ssl >> "$(T)/order"\n'
         for output, name in [("lib/libz.a", "z"), ("lib/libssh2.a", "ssh"),
                              ("lib/libcurl.a", "curl"), ("lib/libncursesw.a", "ncurses"),
-                             ("lib/libkyotocabinet.a", "kyoto"), ("bin/ccache", "ccache")]:
+                             ("lib/libkyotocabinet.a", "kyoto"), ("bin/ccache", "ccache"),
+                             ("lib/libunwind.a", "unwind")]:
             recipe += f'\n$(T)/{output}:\n\t@mkdir -p "$(T)/lib" "$(T)/bin"\n'
             if name == "curl":
                 recipe += '\t@test -f "$(T)/lib/libssh2.a" && test -f "$(T)/lib/libz.a"\n'
@@ -204,12 +206,17 @@ class LibraryBuilds(Workspace):
         recipe += '\n$(B)/$(ZMQ)/.patched:\n\t@touch "$@"\n'
         recipe += '\n$(B)/$(HARFBUZZ)/.patched:\n\t@touch "$@"\n'
         recipe += '\n$(B)/$(READLINE)/.patched:\n\t@touch "$@"\n'
+        recipe += '\n$(B)/$(RSVG)/.patched:\n\t@touch "$@"\n'
+        recipe += '\n$(RUST_STAMP):\n\t@mkdir -p "$(RUST_DIR)"\n\t@touch "$@"\n'
         for variable, name in [("BOOST", "boost"), ("SQLITE", "sqlite"), ("GMP", "gmp"),
                                ("NETTLE", "nettle"), ("GNUTLS", "gnutls"), ("SODIUM", "sodium"),
                                ("ZMQ", "zmq"), ("SDL", "sdl"), ("SDLIMAGE", "sdlimage"),
                                ("SDLTTF", "sdlttf"), ("FREETYPE", "freetype"), ("HARFBUZZ", "harfbuzz"),
                                ("IMGUI", "imgui"), ("READLINE", "readline"), ("LIBFFI", "ffi"),
-                               ("PCRE2", "pcre2"), ("GLIB", "glib"), ("LIBUUID", "uuid")]:
+                               ("PCRE2", "pcre2"), ("GLIB", "glib"), ("LIBUUID", "uuid"),
+                               ("EXECINFO", "execinfo"), ("PIXMAN", "pixman"), ("LIBPNG", "png"),
+                               ("LIBXML2", "xml"), ("FONTCONFIG", "fontconfig"), ("FRIBIDI", "fribidi"),
+                               ("CAIRO", "cairo"), ("PANGO", "pango"), ("RSVG", "rsvg"), ("ALSA", "alsa")]:
             recipe += f'\n$({variable}_OUTPUTS) &:\n'
             recipe += f'\t@for output in $({variable}_OUTPUTS); do mkdir -p "$$(dirname "$$output")"; touch "$$output"; done\n'
             recipe += f'\t@echo {name} >> "$(T)/order"\n'
@@ -232,7 +239,8 @@ class LibraryBuilds(Workspace):
         self.assertEqual(set(first), {"ssl", "z", "ssh", "curl", "ncurses", "kyoto", "ccache",
                                       "boost", "sqlite", "gmp", "nettle", "gnutls", "sodium", "zmq",
                                       "sdl", "sdlimage", "sdlttf", "freetype", "harfbuzz", "imgui", "readline",
-                                      "ffi", "pcre2", "glib", "uuid"})
+                                      "ffi", "pcre2", "glib", "uuid", "execinfo", "pixman", "png", "xml",
+                                      "fontconfig", "fribidi", "cairo", "pango", "rsvg", "alsa", "unwind"})
         self.assertLess(first.index("ssl"), first.index("ssh"))
         self.assertLess(first.index("ssh"), first.index("curl"))
         for dependency, dependent in [("gmp", "nettle"), ("nettle", "gnutls"),
@@ -240,7 +248,10 @@ class LibraryBuilds(Workspace):
                                       ("sdl", "sdlimage"), ("sdl", "sdlttf"), ("z", "freetype"),
                                       ("freetype", "harfbuzz"), ("harfbuzz", "sdlttf"), ("sdl", "imgui"),
                                       ("ncurses", "readline"), ("ffi", "glib"), ("pcre2", "glib"),
-                                      ("z", "glib")]:
+                                      ("z", "glib"), ("z", "png"), ("xml", "fontconfig"),
+                                      ("pixman", "cairo"), ("png", "cairo"), ("fontconfig", "cairo"),
+                                      ("cairo", "pango"), ("fribidi", "pango"), ("pango", "rsvg"),
+                                      ("unwind", "rsvg")]:
             self.assertLess(first.index(dependency), first.index(dependent))
         self.make("libs")
         self.assertEqual(self.order(), first)
@@ -328,7 +339,8 @@ class LibraryBuilds(Workspace):
         before = len(self.order())
         (self.target / "include/freetype2/ft2build.h").unlink()
         self.make("libs")
-        self.assertEqual(self.order()[before:], ["freetype", "harfbuzz", "sdlttf"])
+        self.assertEqual(set(self.order()[before:]),
+                         {"freetype", "harfbuzz", "sdlttf", "fontconfig", "cairo", "pango", "rsvg"})
         before = len(self.order())
         (self.target / "include/imgui/backends/imgui_impl_sdl3.h").unlink()
         self.make("libs")
@@ -366,6 +378,20 @@ class LibraryBuilds(Workspace):
             ("lib/pkgconfig/libpcre2-8.pc", ["pcre2", "glib"]),
             ("lib/glib-2.0/include/glibconfig.h", ["glib"]),
             ("lib/pkgconfig/gio-unix-2.0.pc", ["glib"]),
+        ]:
+            with self.subTest(output=output):
+                before = len(self.order())
+                (self.target / output).unlink()
+                self.make("libs")
+                self.assertEqual(self.order()[before:], rebuilt + ["cairo", "pango", "rsvg"])
+                self.assertTrue((self.target / output).is_file())
+
+    def test_missing_svg_metadata_rebuilds_downstream_packages(self):
+        self.make("libs")
+        for output, rebuilt in [
+            ("lib/pkgconfig/cairo-png.pc", ["cairo", "pango", "rsvg"]),
+            ("lib/pkgconfig/pangoft2.pc", ["pango", "rsvg"]),
+            ("include/librsvg-2.0/librsvg/rsvg-cairo.h", ["rsvg"]),
         ]:
             with self.subTest(output=output):
                 before = len(self.order())

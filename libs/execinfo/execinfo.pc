@@ -1,0 +1,9 @@
+prefix=${pcfiledir}/../..
+libdir=${prefix}/lib
+includedir=${prefix}/include
+
+Name: execinfo
+Description: Backtrace functions for the Dyne musl SDK
+Version: 1.0
+Libs: -L${libdir} -lexecinfo
+Cflags: -I${includedir}

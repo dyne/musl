@@ -1,0 +1,19 @@
+diff --git a/meson/query-rustc.py b/meson/query-rustc.py
+--- a/meson/query-rustc.py
++++ b/meson/query-rustc.py
+@@ -4,6 +4,7 @@ from argparse import ArgumentParser
+ from pathlib import Path
+ import os
+ import re
++import shlex
+ import subprocess
+ import sys
+ import tempfile
+@@ -89,6 +90,7 @@ if __name__ == "__main__":
+     try:
+         # We need these for '--print=native-static-libs' on Windows
+         if query == 'native-static-libs':
++            rustc_cmd.extend(shlex.split(os.environ.get('RUSTFLAGS', '')))
+             rustc_cmd.extend(['--crate-type', 'staticlib'])
+             rustc_cmd.append(os.devnull)
+             rustc_cmd.extend(['-o', dummy_out])
