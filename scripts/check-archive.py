@@ -66,6 +66,20 @@ def check(arch, archive):
                      "rust-std/COPYRIGHT", "rust-std/LICENSE-APACHE", "rust-std/LICENSE-MIT",
                      "cairo/COPYING", "pixman/COPYING", "libpng/LICENSE", "pango/COPYING",
                      "fontconfig/COPYING", "fribidi/COPYING", "libxml2/Copyright", "alsa-lib/COPYING"])
+    for name in ["avcodec", "avdevice", "avfilter", "avformat", "avutil", "swresample", "swscale"]:
+        required.update({f"{target}/lib/lib{name}.a", f"{target}/lib/pkgconfig/lib{name}.pc",
+                         f"{target}/include/lib{name}/{name}.h"})
+    required.update(target + "/bin/" + tool for tool in ["ffmpeg", "ffprobe"])
+    required.update(target + "/lib/lib" + lib + ".a" for lib in
+                    ["dav1d", "vpx", "jxl", "jxl_cms", "jxl_threads", "hwy", "brotlicommon",
+                     "brotlidec", "brotlienc", "lcms2", "ass", "zimg", "bz2", "lzma"])
+    required.update(target + "/lib/pkgconfig/" + lib + ".pc" for lib in
+                    ["dav1d", "vpx", "libjxl", "libjxl_cms", "libjxl_threads", "libhwy", "libbrotlicommon",
+                     "libbrotlidec", "libbrotlienc", "lcms2", "libass", "zimg", "liblzma"])
+    required.update(target + "/share/licenses/" + license for license in
+                    ["ffmpeg/COPYING.LGPLv2.1", "ffmpeg/LICENSE.md", "dav1d/COPYING", "libvpx/LICENSE",
+                     "libvpx/PATENTS", "libjxl/LICENSE", "libjxl/PATENTS", "highway/LICENSE", "brotli/LICENSE",
+                     "lcms2/LICENSE", "libass/COPYING", "zimg/COPYING", "bzip2/LICENSE", "xz/COPYING"])
     with tarfile.open(archive, "r:xz") as package:
         members = package.getmembers()
         for member in members:

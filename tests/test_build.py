@@ -127,7 +127,8 @@ class Downloads(Workspace):
         for directory, filename in [("gcc-musl", "Makefile"), ("libs", "GNUmakefile")]:
             (self.work / directory).mkdir()
             shutil.copy(ROOT / directory / filename, self.work / directory / filename)
-        shutil.copy(ROOT / "libs/media.mk", self.work / "libs")
+        for makefile in ["media.mk", "ffmpeg.mk"]:
+            shutil.copy(ROOT / "libs" / makefile, self.work / "libs")
         shutil.copytree(ROOT / "gcc-musl/hashes", self.work / "gcc-musl/hashes")
         shutil.copytree(ROOT / "scripts", self.work / "scripts")
         names = [line.split()[0] for line in (ROOT / "sources.urls").read_text().splitlines()]
@@ -165,7 +166,8 @@ class LibraryBuilds(Workspace):
         cache.mkdir(parents=True)
         recipe = (ROOT / "libs/GNUmakefile").read_text()
         shutil.copy(ROOT / "libs/GNUmakefile", self.work / "libs")
-        shutil.copy(ROOT / "libs/media.mk", self.work / "libs")
+        for makefile in ["media.mk", "ffmpeg.mk"]:
+            shutil.copy(ROOT / "libs" / makefile, self.work / "libs")
         shutil.copytree(ROOT / "libs/execinfo", self.work / "libs/execinfo")
         shutil.copytree(ROOT / "libs/patches", self.work / "libs/patches")
         shutil.copytree(ROOT / "libs/cmake", self.work / "libs/cmake")
@@ -217,7 +219,10 @@ class LibraryBuilds(Workspace):
                                ("PCRE2", "pcre2"), ("GLIB", "glib"), ("LIBUUID", "uuid"), ("LIBMAGIC", "magic"),
                                ("EXECINFO", "execinfo"), ("PIXMAN", "pixman"), ("LIBPNG", "png"),
                                ("LIBXML2", "xml"), ("FONTCONFIG", "fontconfig"), ("FRIBIDI", "fribidi"),
-                               ("CAIRO", "cairo"), ("PANGO", "pango"), ("RSVG", "rsvg"), ("ALSA", "alsa")]:
+                               ("CAIRO", "cairo"), ("PANGO", "pango"), ("RSVG", "rsvg"), ("ALSA", "alsa"),
+                               ("DAV1D", "dav1d"), ("VPX", "vpx"), ("HWY", "hwy"), ("BROTLI", "brotli"),
+                               ("LCMS2", "lcms2"), ("JXL", "jxl"), ("ASS", "ass"), ("ZIMG", "zimg"),
+                               ("BZIP2", "bz2"), ("XZ", "xz"), ("FFMPEG", "ffmpeg")]:
             recipe += f'\n$({variable}_OUTPUTS) &:\n'
             recipe += f'\t@for output in $({variable}_OUTPUTS); do mkdir -p "$$(dirname "$$output")"; touch "$$output"; done\n'
             recipe += f'\t@echo {name} >> "$(T)/order"\n'
@@ -241,7 +246,9 @@ class LibraryBuilds(Workspace):
                                       "boost", "sqlite", "gmp", "nettle", "gnutls", "sodium", "zmq",
                                       "sdl", "sdlimage", "sdlttf", "freetype", "harfbuzz", "imgui", "readline",
                                       "ffi", "pcre2", "glib", "uuid", "execinfo", "pixman", "png", "xml",
-                                      "fontconfig", "fribidi", "cairo", "pango", "rsvg", "alsa", "unwind", "magic"})
+                                      "fontconfig", "fribidi", "cairo", "pango", "rsvg", "alsa", "unwind", "magic",
+                                      "dav1d", "vpx", "hwy", "brotli", "lcms2", "jxl", "ass", "zimg",
+                                      "bz2", "xz", "ffmpeg"})
         self.assertLess(first.index("ssl"), first.index("ssh"))
         self.assertLess(first.index("ssh"), first.index("curl"))
         for dependency, dependent in [("gmp", "nettle"), ("nettle", "gnutls"),
@@ -252,8 +259,11 @@ class LibraryBuilds(Workspace):
                                       ("z", "glib"), ("z", "png"), ("z", "magic"), ("xml", "fontconfig"),
                                       ("pixman", "cairo"), ("png", "cairo"), ("fontconfig", "cairo"),
                                       ("cairo", "pango"), ("fribidi", "pango"), ("pango", "rsvg"),
-                                      ("unwind", "rsvg")]:
+                                      ("unwind", "rsvg"), ("hwy", "jxl"), ("brotli", "jxl"), ("lcms2", "jxl"),
+                                      ("fontconfig", "ass")]:
             self.assertLess(first.index(dependency), first.index(dependent))
+        for dependency in ["dav1d", "vpx", "jxl", "ass", "zimg", "bz2", "xz", "rsvg", "gnutls"]:
+            self.assertLess(first.index(dependency), first.index("ffmpeg"))
         self.make("libs")
         self.assertEqual(self.order(), first)
         self.assertEqual((self.work / "gcc-invocations").read_text().splitlines(), ["gcc", "gcc"])
@@ -315,7 +325,7 @@ class LibraryBuilds(Workspace):
         before = len(self.order())
         (self.target / "lib/pkgconfig/gnutls.pc").unlink()
         self.make("libs")
-        self.assertEqual(self.order()[before:], ["gnutls", "zmq"])
+        self.assertEqual(set(self.order()[before:]), {"gnutls", "zmq", "ffmpeg"})
         before = len(self.order())
         (self.target / "lib/cmake/ZeroMQ/ZeroMQConfig.cmake").unlink()
         self.make("libs")
@@ -341,7 +351,7 @@ class LibraryBuilds(Workspace):
         (self.target / "include/freetype2/ft2build.h").unlink()
         self.make("libs")
         self.assertEqual(set(self.order()[before:]),
-                         {"freetype", "harfbuzz", "sdlttf", "fontconfig", "cairo", "pango", "rsvg"})
+                         {"freetype", "harfbuzz", "sdlttf", "fontconfig", "cairo", "pango", "rsvg", "ass", "ffmpeg"})
         before = len(self.order())
         (self.target / "include/imgui/backends/imgui_impl_sdl3.h").unlink()
         self.make("libs")
@@ -384,7 +394,7 @@ class LibraryBuilds(Workspace):
                 before = len(self.order())
                 (self.target / output).unlink()
                 self.make("libs")
-                self.assertEqual(self.order()[before:], rebuilt + ["cairo", "pango", "rsvg"])
+                self.assertEqual(self.order()[before:], rebuilt + ["cairo", "pango", "rsvg", "ffmpeg"])
                 self.assertTrue((self.target / output).is_file())
 
     def test_missing_svg_metadata_rebuilds_downstream_packages(self):
@@ -393,6 +403,22 @@ class LibraryBuilds(Workspace):
             ("lib/pkgconfig/cairo-png.pc", ["cairo", "pango", "rsvg"]),
             ("lib/pkgconfig/pangoft2.pc", ["pango", "rsvg"]),
             ("include/librsvg-2.0/librsvg/rsvg-cairo.h", ["rsvg"]),
+        ]:
+            with self.subTest(output=output):
+                before = len(self.order())
+                (self.target / output).unlink()
+                self.make("libs")
+                self.assertEqual(self.order()[before:], rebuilt + ["ffmpeg"])
+                self.assertTrue((self.target / output).is_file())
+
+    def test_missing_ffmpeg_outputs_and_dependencies_rebuild(self):
+        self.make("libs")
+        for output, rebuilt in [
+            ("lib/pkgconfig/libjxl_threads.pc", ["jxl", "ffmpeg"]),
+            ("bin/ffprobe", ["ffmpeg"]),
+            ("include/libavformat/avformat.h", ["ffmpeg"]),
+            ("lib/libswscale.a", ["ffmpeg"]),
+            ("lib/pkgconfig/libavcodec.pc", ["ffmpeg"]),
         ]:
             with self.subTest(output=output):
                 before = len(self.order())

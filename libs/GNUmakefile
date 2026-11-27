@@ -125,6 +125,7 @@ CMAKE_FLAGS = -G Ninja -DARCH=$(ARCH) -DROOT="$(R)" -DTARGET_PREFIX="$(T)" \
 	-DCCACHE=$(if $(CCACHE_LAUNCHER),ON,OFF)
 
 include media.mk
+include ffmpeg.mk
 
 .PHONY: all fetch build clean FORCE
 # Verify every cached input before any extraction or compilation starts.
@@ -138,7 +139,7 @@ build: $(OUTPUTS)
 $(B)/config: FORCE
 	@mkdir -p "$(B)"
 	@set -e; { $(foreach key,ARCH T TOOLCHAIN CC CXX AR RANLIB CFLAGS CXXFLAGS LDFLAGS PACKAGES ARCHIVES CCACHE_LAUNCHER,printf '%s\n' '$(key)=$($(key))';) \
-		sha256sum GNUmakefile media.mk "$(R)/settings.cmake" "$(CHECKSUMS)" "$(TOOLCHAIN)/bin/$(ARCH)-gcc"; \
+		sha256sum GNUmakefile media.mk ffmpeg.mk "$(R)/settings.cmake" "$(CHECKSUMS)" "$(TOOLCHAIN)/bin/$(ARCH)-gcc"; \
 		$(foreach input,$(LIBRARY_PATCHES) $(PACKAGE_CMAKE) $(MEDIA_INPUTS),sha256sum "$(input)";) \
 		if test "$(TOOLCHAIN)" = "$(R)/dyne/gcc-musl" && test -f "$(R)/build/toolchain/$(ARCH)/config"; then \
 			sha256sum "$(R)/build/toolchain/$(ARCH)/config"; \
@@ -363,8 +364,10 @@ $(GMP_OUTPUTS) &: $(B)/$(GMP)/.extracted
 	cp "$(B)/$(GMP)"/COPYING* "$(T)/share/licenses/gmp/"
 
 # Nettle 3 is the supported API used by GnuTLS 3.8 (Nettle 4 changes it).
+# FFmpeg's AArch64 link exceeds the GOT limit of Nettle's default -fpic.
 $(NETTLE_OUTPUTS) &: $(B)/$(NETTLE)/.extracted $(GMP_OUTPUTS)
 	cd "$(B)/$(NETTLE)" && $(AUTOCONF_ENV) CPPFLAGS="-I$(T)/include" \
+		$(if $(filter aarch64,$(TARGET_CPU)),lsh_cv_sys_ccpic=-fPIC) \
 		LDFLAGS="$(LDFLAGS) -L$(T)/lib" ./configure --prefix="$(T)" --libdir="$(T)/lib" \
 		--build=x86_64-linux-musl --host=$(ARCH) --disable-shared --enable-static --enable-pic --disable-documentation
 	$(CACHE_ENV) $(MAKE) -C "$(B)/$(NETTLE)" -j$(JOBS) libnettle.a libhogweed.a

@@ -50,3 +50,14 @@ rust-std-1.96.1-arm-unknown-linux-musleabihf.tar.xz https://static.rust-lang.org
 rust-std-1.96.1-riscv64gc-unknown-linux-musl.tar.xz https://static.rust-lang.org/dist/2026-06-30/rust-std-1.96.1-riscv64gc-unknown-linux-musl.tar.xz
 cargo-c-0.10.28-x86_64-unknown-linux-musl.tar.gz https://github.com/lu-zero/cargo-c/releases/download/v0.10.28/cargo-c-x86_64-unknown-linux-musl.tar.gz
 file-5.48.tar.gz https://www.astron.com/pub/file/file-5.48.tar.gz
+ffmpeg-9.1.tar.xz https://ffmpeg.org/releases/ffmpeg-9.1.tar.xz
+dav1d-1.5.5.tar.xz https://download.videolan.org/pub/videolan/dav1d/1.5.5/dav1d-1.5.5.tar.xz
+libvpx-1.17.0.tar.gz https://github.com/webmproject/libvpx/archive/refs/tags/v1.17.0.tar.gz
+libjxl-0.13.0.tar.gz https://github.com/libjxl/libjxl/archive/refs/tags/v0.13.0.tar.gz
+highway-1.4.0.tar.gz https://github.com/google/highway/releases/download/1.4.0/highway-1.4.0.tar.gz
+brotli-1.2.1.tar.gz https://github.com/google/brotli/archive/refs/tags/v1.2.1.tar.gz
+libass-0.17.5.tar.xz https://github.com/libass/libass/releases/download/0.17.5/libass-0.17.5.tar.xz
+zimg-3.0.6.tar.gz https://github.com/sekrit-twc/zimg/archive/refs/tags/release-3.0.6.tar.gz
+bzip2-1.0.8.tar.gz https://sourceware.org/pub/bzip2/bzip2-1.0.8.tar.gz
+xz-5.8.4.tar.xz https://github.com/tukaani-project/xz/releases/download/v5.8.4/xz-5.8.4.tar.xz
+lcms2-2.20.tar.gz https://github.com/mm2/Little-CMS/releases/download/lcms2.20/lcms2-2.20.tar.gz

@@ -12,6 +12,8 @@ list(APPEND PKG_CONFIG_ARGN --dont-define-prefix --static)
 pkg_check_modules(SVG REQUIRED IMPORTED_TARGET librsvg-2.0)
 pkg_check_modules(EXECINFO REQUIRED IMPORTED_TARGET execinfo)
 pkg_check_modules(ALSA REQUIRED IMPORTED_TARGET alsa)
+pkg_check_modules(FFMPEG REQUIRED IMPORTED_TARGET
+  libavformat libavfilter libavdevice libavcodec libavutil libswresample libswscale)
 
 add_executable(svg svg.c)
 target_link_libraries(svg PRIVATE PkgConfig::SVG)
@@ -29,7 +31,17 @@ target_link_libraries(execinfo PRIVATE PkgConfig::EXECINFO PkgConfig::SVG)
 add_executable(alsa alsa.c)
 target_link_libraries(alsa PRIVATE PkgConfig::ALSA)
 
+add_executable(ffmpeg-api ffmpeg.c)
+target_link_libraries(ffmpeg-api PRIVATE PkgConfig::FFMPEG)
+if(ARCH STREQUAL "arm-linux-musleabihf")
+  # Libatomic's fallback lock code has text relocations in a static PIE.
+  set_property(TARGET ffmpeg-api PROPERTY POSITION_INDEPENDENT_CODE OFF)
+endif()
+
 enable_testing()
 add_test(NAME svg COMMAND svg "${font}")
 add_test(NAME execinfo COMMAND execinfo)
 add_test(NAME alsa COMMAND alsa)
+add_test(NAME ffmpeg-api COMMAND ffmpeg-api)
+add_test(NAME ffmpeg-cli COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/ffmpeg-cli.py"
+  "${TARGET_PREFIX}/bin/ffmpeg" "${TARGET_PREFIX}/bin/ffprobe")

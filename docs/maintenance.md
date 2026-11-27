@@ -85,7 +85,11 @@ and identifies a gzip-compressed GIF in memory. A native `file` binary from
 the pinned release compiles the database during the SDK build.
 The [headless media checks](ffmpeg.md) rasterise SVG shapes and text with a
 generated font, emit PNG, collect a C++ backtrace, and open the ALSA null PCM
-using only the static SDK. Fontconfig's build requires host gperf and
+using only the static SDK. The FFmpeg checks link all seven installed
+libraries using pkg-config, decode SVG bytes directly into an AVFrame, and
+exercise `ffmpeg` and `ffprobe` through pipes. The FFmpeg dependency build
+uses host NASM on x86_64 and Autoconf, Automake, and Libtool for zimg.
+Fontconfig's build requires host gperf and
 Meson 1.11 or newer. The Alpine build uses GNU tar to extract the pinned
 Rust archives, which use an XZ dictionary larger than BusyBox tar supports.
 It also discovers installed Boost/SQLite/ZeroMQ packages through CMake, links
