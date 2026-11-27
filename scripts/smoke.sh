@@ -13,7 +13,7 @@ target=${TARGET_PREFIX:-$PWD/dyne/$arch}
 build=${SMOKE_BUILD_DIR:-$PWD/build/smoke/$arch}
 readelf=$compiler/bin/$arch-readelf
 mkdir -p "$build"
-for library in ssl crypto z curl ssh2 ncursesw readline history kyotocabinet sqlite3 gmp nettle hogweed gnutls sodium zmq SDL3 SDL3_image SDL3_ttf freetype harfbuzz imgui ffi pcre2-8 glib-2.0 gobject-2.0 gmodule-2.0 gthread-2.0 gio-2.0; do
+for library in ssl crypto z curl ssh2 ncursesw readline history kyotocabinet sqlite3 gmp nettle hogweed gnutls sodium zmq SDL3 SDL3_image SDL3_ttf freetype harfbuzz imgui ffi pcre2-8 glib-2.0 gobject-2.0 gmodule-2.0 gthread-2.0 gio-2.0 uuid; do
     test -s "$target/lib/lib$library.a"
 done
 test -x "$target/bin/ccache"
@@ -48,8 +48,12 @@ cmake -S tests/glib -B "$build/glib" \
     -DCMAKE_TOOLCHAIN_FILE="$PWD/settings.cmake" -DARCH="$arch" \
     -DTOOLCHAIN_PREFIX="$compiler" -DTARGET_PREFIX="$target" -DCCACHE=OFF -DFORCE_STATIC=ON
 cmake --build "$build/glib" --parallel 2
+cmake -S tests/uuid -B "$build/uuid" \
+    -DCMAKE_TOOLCHAIN_FILE="$PWD/settings.cmake" -DARCH="$arch" \
+    -DTOOLCHAIN_PREFIX="$compiler" -DTARGET_PREFIX="$target" -DCCACHE=OFF -DFORCE_STATIC=ON
+cmake --build "$build/uuid" --parallel 2
 for binary in "$build/toolchain" "$build/static-pie" "$build/static-and-pie" \
-    "$build/c" "$build/cpp" "$build/dependencies/dependencies" "$build/dependencies/pkgconfig" \
+    "$build/c" "$build/cpp" "$build/uuid/uuid-smoke" "$build/dependencies/dependencies" "$build/dependencies/pkgconfig" \
     "$build/dependencies/avena-dependencies" "$build/sdl/sdl" "$build/sdl/sdl-pkgconfig" \
     "$build/curl/curl-pkgconfig" "$build/curl/curl-config" \
     "$build/imgui/imgui" "$build/imgui/imgui-pkgconfig" \
@@ -64,7 +68,7 @@ for binary in "$build/toolchain" "$build/static-pie" "$build/static-and-pie" \
         exit 1
     fi
 done
-for binary in "$build/static-pie" "$build/static-and-pie" \
+for binary in "$build/static-pie" "$build/static-and-pie" "$build/uuid/uuid-smoke" \
     "$build/dependencies/dependencies" "$build/dependencies/pkgconfig" "$build/sdl/sdl" "$build/sdl/sdl-pkgconfig" \
     "$build/imgui/imgui" "$build/imgui/imgui-pkgconfig" \
     "$build/readline/readline" "$build/readline/history" "$build/glib/glib-smoke"; do
@@ -80,6 +84,7 @@ if [[ $arch == x86_64-linux-musl && $(uname -m) == x86_64 ]]; then
     "$build/static-and-pie"
     "$build/c"
     "$build/cpp"
+    "$build/uuid/uuid-smoke"
     "$build/dependencies/dependencies"
     "$build/dependencies/pkgconfig"
     "$build/dependencies/avena-dependencies"

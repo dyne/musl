@@ -101,6 +101,10 @@ History-only applications can use `-lhistory` or the `history` pkg-config packag
 without ncurses. Both pkg-config files remain valid when the SDK moves.
 Readline retains its upstream GPLv3-or-later license in `share/licenses/readline/`.
 
+util-linux **2.42.4** provides static `libuuid.a` and `<uuid/uuid.h>`. Use
+`pkg-config --static --cflags --libs uuid` for the compiler and linker flags,
+including the include path for projects that use `<uuid.h>`.
+
 GLib **2.90.1** includes static GLib, GObject, GIO, GModule and GThread
 libraries. Use `pkg-config --static --cflags --libs gio-2.0` for GIO or
 `gio-unix-2.0` for its Unix-specific headers. GLib uses bundled PCRE2 **10.49**

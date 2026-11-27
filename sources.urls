@@ -29,3 +29,4 @@ imgui-1.93.0.tar.gz https://github.com/ocornut/imgui/archive/refs/tags/v1.93.0.t
 libffi-3.8.1.tar.gz https://github.com/libffi/libffi/releases/download/v3.8.1/libffi-3.8.1.tar.gz
 pcre2-10.49.tar.gz https://github.com/PCRE2Project/pcre2/releases/download/pcre2-10.49/pcre2-10.49.tar.gz
 glib-2.90.1.tar.xz https://download.gnome.org/sources/glib/2.90/glib-2.90.1.tar.xz
+util-linux-2.42.4.tar.xz https://www.kernel.org/pub/linux/utils/util-linux/v2.42/util-linux-2.42.4.tar.xz

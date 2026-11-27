@@ -50,6 +50,7 @@ IMGUI ?= imgui-1.93.0
 LIBFFI ?= libffi-3.8.1
 PCRE2 ?= pcre2-10.49
 GLIB ?= glib-2.90.1
+LIBUUID ?= util-linux-2.42.4
 BOOST_VERSION := $(patsubst boost-%,%,$(BOOST))
 ZMQ_PATCHES := $(sort $(wildcard patches/$(ZMQ)/*.patch))
 HARFBUZZ_PATCHES := $(sort $(wildcard patches/$(HARFBUZZ)/*.patch))
@@ -57,11 +58,11 @@ READLINE_PATCHES := $(sort $(wildcard patches/$(READLINE)/*.patch))
 LIBRARY_PATCHES := $(ZMQ_PATCHES) $(HARFBUZZ_PATCHES) $(READLINE_PATCHES)
 PACKAGE_CMAKE := $(sort $(wildcard cmake/*.cmake cmake/imgui/*))
 
-PACKAGES := $(LIBSSL) $(ZLIB) $(CURL) $(SSH2) $(CCACHE) $(NCURSES) $(READLINE) $(KYOTOCAB) $(BOOST) $(SQLITE) $(GMP) $(NETTLE) $(GNUTLS) $(SODIUM) $(ZMQ) $(SDL) $(SDLIMAGE) $(SDLTTF) $(FREETYPE) $(HARFBUZZ) $(IMGUI) $(LIBFFI) $(PCRE2) $(GLIB)
+PACKAGES := $(LIBSSL) $(ZLIB) $(CURL) $(SSH2) $(CCACHE) $(NCURSES) $(READLINE) $(KYOTOCAB) $(BOOST) $(SQLITE) $(GMP) $(NETTLE) $(GNUTLS) $(SODIUM) $(ZMQ) $(SDL) $(SDLIMAGE) $(SDLTTF) $(FREETYPE) $(HARFBUZZ) $(IMGUI) $(LIBFFI) $(PCRE2) $(GLIB) $(LIBUUID)
 ARCHIVES := $(LIBSSL).tar.gz $(ZLIB).tar.gz $(CURL).tar.xz $(SSH2).tar.xz $(CCACHE).tar.xz $(NCURSES).tar.gz $(KYOTOCAB).tar.gz \
 	$(BOOST).tar.xz $(SQLITE).tar.gz $(GMP).tar.xz $(NETTLE).tar.gz $(GNUTLS).tar.xz $(SODIUM).tar.gz $(ZMQ).tar.gz \
 	$(SDL).tar.gz $(SDLIMAGE).tar.gz $(SDLTTF).tar.gz $(FREETYPE).tar.xz $(HARFBUZZ).tar.xz $(IMGUI).tar.gz $(READLINE).tar.gz \
-	$(LIBFFI).tar.gz $(PCRE2).tar.gz $(GLIB).tar.xz
+	$(LIBFFI).tar.gz $(PCRE2).tar.gz $(GLIB).tar.xz $(LIBUUID).tar.xz
 READLINE_OUTPUTS := $(T)/lib/libreadline.a $(T)/lib/libhistory.a \
 	$(addprefix $(T)/include/readline/,readline.h history.h keymaps.h chardefs.h tilde.h rlstdc.h rlconf.h rltypedefs.h) \
 	$(T)/lib/pkgconfig/readline.pc $(T)/lib/pkgconfig/history.pc
@@ -98,11 +99,13 @@ GLIB_OUTPUTS := $(addprefix $(T)/lib/lib,$(addsuffix -2.0.a,glib gobject gmodule
 	$(addprefix $(T)/include/glib-2.0/,glib.h glib-object.h gmodule.h gio/gio.h) \
 	$(T)/include/gio-unix-2.0/gio/gunixinputstream.h $(T)/lib/glib-2.0/include/glibconfig.h \
 	$(T)/share/licenses/glib/COPYING $(T)/share/licenses/glib/gvdb/COPYING
+LIBUUID_OUTPUTS := $(T)/lib/libuuid.a $(T)/include/uuid/uuid.h $(T)/lib/pkgconfig/uuid.pc \
+	$(T)/share/licenses/libuuid/COPYING $(T)/share/licenses/libuuid/COPYING.BSD-3-Clause
 OUTPUTS := $(T)/lib/libssl.a $(T)/lib/libcrypto.a $(T)/lib/libz.a \
 	$(T)/lib/libcurl.a $(T)/lib/libssh2.a $(T)/lib/libncursesw.a \
 	$(T)/lib/libkyotocabinet.a $(T)/bin/ccache $(BOOST_OUTPUTS) $(SQLITE_OUTPUTS) $(GMP_OUTPUTS) $(NETTLE_OUTPUTS) $(GNUTLS_OUTPUTS) $(SODIUM_OUTPUTS) $(ZMQ_OUTPUTS) \
 	$(SDL_OUTPUTS) $(SDLIMAGE_OUTPUTS) $(SDLTTF_OUTPUTS) $(FREETYPE_OUTPUTS) $(HARFBUZZ_OUTPUTS) $(IMGUI_OUTPUTS) $(READLINE_OUTPUTS) \
-	$(LIBFFI_OUTPUTS) $(PCRE2_OUTPUTS) $(GLIB_OUTPUTS)
+	$(LIBFFI_OUTPUTS) $(PCRE2_OUTPUTS) $(GLIB_OUTPUTS) $(LIBUUID_OUTPUTS)
 CACHE_ENV = sh "$(R)/scripts/compiler-cache.sh" "$(CCACHE_LAUNCHER)" "$(TOOLCHAIN)/bin/$(ARCH)-gcc"
 comma := ,
 MESON_LAUNCHER = $(if $(CCACHE_LAUNCHER),'$(CCACHE_LAUNCHER)'$(comma))
@@ -186,6 +189,21 @@ $(PCRE2_OUTPUTS) &: $(B)/$(PCRE2)/.extracted
 	$(CACHE_ENV) cmake --install "$(B)/$(PCRE2)/build"
 	sed -i 's|^prefix=.*|prefix=$${pcfiledir}/../..|' "$(T)"/lib/pkgconfig/libpcre2-*.pc
 	install -Dm644 "$(B)/$(PCRE2)/LICENCE.md" "$(T)/share/licenses/pcre2/LICENCE.md"
+
+$(LIBUUID_OUTPUTS) &: $(B)/$(LIBUUID)/.extracted
+	cd "$(B)/$(LIBUUID)" && $(AUTOCONF_ENV) CFLAGS="$(CFLAGS) -fPIC" \
+		./configure --prefix="$(T)" --build=x86_64-linux-musl --host=$(ARCH) --localstatedir=/var \
+		--disable-all-programs --enable-libuuid --disable-shared --enable-static --with-pic \
+		--disable-nls --disable-asciidoc --disable-bash-completion --without-python
+	$(CACHE_ENV) $(MAKE) -C "$(B)/$(LIBUUID)" -j$(JOBS)
+	$(CACHE_ENV) $(MAKE) -C "$(B)/$(LIBUUID)" \
+		install-usrlib_execLTLIBRARIES install-uuidincHEADERS install-pkgconfigDATA
+	sed -i -e 's|^prefix=.*|prefix=$${pcfiledir}/../..|' \
+		-e 's|^exec_prefix=.*|exec_prefix=$${prefix}|' -e 's|^libdir=.*|libdir=$${prefix}/lib|' \
+		-e 's|^includedir=.*|includedir=$${prefix}/include|' "$(T)/lib/pkgconfig/uuid.pc"
+	install -Dm644 "$(B)/$(LIBUUID)/libuuid/COPYING" "$(T)/share/licenses/libuuid/COPYING"
+	install -Dm644 "$(B)/$(LIBUUID)/Documentation/licenses/COPYING.BSD-3-Clause" \
+		"$(T)/share/licenses/libuuid/COPYING.BSD-3-Clause"
 
 # Keep host tools native and limit Meson's target pkg-config lookup to this prefix.
 $(GLIB_OUTPUTS) &: $(B)/$(GLIB)/.extracted $(LIBFFI_OUTPUTS) $(PCRE2_OUTPUTS) $(T)/lib/libz.a
