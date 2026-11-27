@@ -80,6 +80,10 @@ linking, including History without Readline/ncurses. It checks ELF machine
 identity and absence of dynamic dependencies, including packaged ccache.
 The static PIE UUID consumer uses `uuid` pkg-config metadata to resolve
 `<uuid.h>` and checks that a generated UUID survives a text round trip.
+The [headless media checks](ffmpeg.md) rasterise SVG shapes and text with a
+generated font, emit PNG, collect a C++ backtrace, and open the ALSA null PCM
+using only the static SDK. Fontconfig's build requires host gperf and
+Meson 1.11 or newer.
 It also discovers installed Boost/SQLite/ZeroMQ packages through CMake, links
 GnuTLS and libsodium statically, and exercises CURVE and certificate-verified
 WSS on native x86_64. See [the dependency profile and update procedure](bitcoin.md). Native
@@ -255,6 +259,16 @@ available before accepting new pins.
 Readline uses GNU's official mirror redirect. The direct GNU FTP host stalled
 while serving the archive to GitHub Actions runners. The mirror serves the
 same release archive, which the downloader checks against the pinned SHA-256.
+
+The headless SVG stack reuses the existing GLib, FreeType, HarfBuzz, and zlib
+builds. Update the media package and Rust pins in `libs/media.mk` and the
+source manifests together. The Rust compiler, Cargo, target standard library,
+and cargo-c are build tools. Only the Rust unwind archive required by
+librsvg's static C interface is installed separately in the SDK.
+`cargo fetch --locked` reads the checked-in registry checksums in the verified
+librsvg release's `Cargo.lock` and populates `.cache/cargo`. The compile and
+install steps run Cargo offline. Set `CARGO_NET_OFFLINE=true` to require a
+populated crate cache when rebuilding.
 
 ### Repeatable upstream update procedure
 

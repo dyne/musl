@@ -1,0 +1,13 @@
+diff --git a/meson.build b/meson.build
+--- a/meson.build
++++ b/meson.build
+@@ -120,5 +120,8 @@ pangoft2_dep   = dependency('pangoft2',
+                             fallback: ['pango', 'libpangoft2_dep'])
+-gmodule_dep    = dependency('gmodule-2.0', version: glib_required,
++# Exporting Rust TLS symbols from a static PIE leaves runtime relocations
++# that musl's static startup does not resolve.
++gmodule_package = get_option('default_library') == 'static' ? 'gmodule-no-export-2.0' : 'gmodule-2.0'
++gmodule_dep    = dependency(gmodule_package, version: glib_required,
+                             fallback : ['glib', 'libgmodule_dep'])
+ rst2man        = find_program('rst2man', 'rst2man.py',
+                               required: get_option('docs'),

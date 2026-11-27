@@ -105,6 +105,11 @@ util-linux **2.42.4** provides static `libuuid.a` and `<uuid/uuid.h>`. Use
 `pkg-config --static --cflags --libs uuid` for the compiler and linker flags,
 including the include path for projects that use `<uuid.h>`.
 
+The [headless SVG and FFmpeg profile](ffmpeg.md) includes static librsvg,
+Cairo with PNG and GObject support, Pixman, libpng, Pango with PangoCairo and
+PangoFT2, Fontconfig, FriBidi, and libxml2. The SDK also includes ALSA and
+`<execinfo.h>` with `libexecinfo.a` for stack traces.
+
 GLib **2.90.1** includes static GLib, GObject, GIO, GModule and GThread
 libraries. Use `pkg-config --static --cflags --libs gio-2.0` for GIO or
 `gio-unix-2.0` for its Unix-specific headers. GLib uses bundled PCRE2 **10.49**

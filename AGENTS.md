@@ -38,7 +38,7 @@ before making claims about what is currently published.
 | `sources.urls`, `sources.sha256`, `scripts/download.sh` | Exact upstream URLs and integrity checks for new and cached inputs |
 | `scripts/toolchain-state.sh` | Invalidates selected compiler build/install state when inputs change |
 | `scripts/compiler-cache.sh`, `scripts/check-ccache.sh` | GCC/frontend cache identity and real bootstrap C/C++ hit probes |
-| `libs/GNUmakefile` | Library versions, dependency graph, per-target sources and installation |
+| `libs/GNUmakefile`, `libs/media.mk` | Library versions, dependency graph, per-target sources and installation |
 | `settings.cmake` | Consumer/internal cross-compilation settings |
 | `prepare.sh`, `scripts/smoke.sh`, `tests/` | Package preparation, real C/C++ checks, offline regression suite |
 | `scripts/relocate-metadata.py`, `tests/curl/` | Relocatable pkg-config/CMake metadata and static C++20/libcurl consumers |
@@ -202,6 +202,9 @@ override has been removed and is ignored. No build input depends on Dyne's
 source cache. There is no automatic version selection or mirror fallback.
 Local verified download caches remain available for repeat and offline builds.
 All selected compiler inputs and library caches are SHA-256 checked on builds.
+For librsvg's Cargo dependencies, the verified upstream `Cargo.lock` pins
+the registry versions and checksums. The SDK build fetches these crates with
+`--locked` and compiles offline.
 New downloads fail on HTTP errors and publish only after verification. Corrupt
 existing inputs fail closed; remove the identified entry before retrying.
 An external SOURCES path must already contain all inputs and is treated as

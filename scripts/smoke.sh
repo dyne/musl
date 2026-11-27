@@ -52,12 +52,17 @@ cmake -S tests/uuid -B "$build/uuid" \
     -DCMAKE_TOOLCHAIN_FILE="$PWD/settings.cmake" -DARCH="$arch" \
     -DTOOLCHAIN_PREFIX="$compiler" -DTARGET_PREFIX="$target" -DCCACHE=OFF -DFORCE_STATIC=ON
 cmake --build "$build/uuid" --parallel 2
+cmake -S tests/media -B "$build/media" \
+    -DCMAKE_TOOLCHAIN_FILE="$PWD/settings.cmake" -DARCH="$arch" \
+    -DTOOLCHAIN_PREFIX="$compiler" -DTARGET_PREFIX="$target" -DCCACHE=OFF -DFORCE_STATIC=ON
+cmake --build "$build/media" --parallel 2
 for binary in "$build/toolchain" "$build/static-pie" "$build/static-and-pie" \
     "$build/c" "$build/cpp" "$build/uuid/uuid-smoke" "$build/dependencies/dependencies" "$build/dependencies/pkgconfig" \
     "$build/dependencies/avena-dependencies" "$build/sdl/sdl" "$build/sdl/sdl-pkgconfig" \
     "$build/curl/curl-pkgconfig" "$build/curl/curl-config" \
     "$build/imgui/imgui" "$build/imgui/imgui-pkgconfig" \
-    "$build/readline/readline" "$build/readline/history" "$build/glib/glib-smoke" "$target/bin/ccache"; do
+    "$build/readline/readline" "$build/readline/history" "$build/glib/glib-smoke" \
+    "$build/media/svg" "$build/media/execinfo" "$build/media/alsa" "$target/bin/ccache"; do
     headers=$("$readelf" -h -l -d "$binary")
     if ! grep -q "$machine" <<< "$headers"; then
         echo "Unexpected ELF machine for $arch: $binary" >&2
@@ -71,7 +76,8 @@ done
 for binary in "$build/static-pie" "$build/static-and-pie" "$build/uuid/uuid-smoke" \
     "$build/dependencies/dependencies" "$build/dependencies/pkgconfig" "$build/sdl/sdl" "$build/sdl/sdl-pkgconfig" \
     "$build/imgui/imgui" "$build/imgui/imgui-pkgconfig" \
-    "$build/readline/readline" "$build/readline/history" "$build/glib/glib-smoke"; do
+    "$build/readline/readline" "$build/readline/history" "$build/glib/glib-smoke" \
+    "$build/media/svg" "$build/media/execinfo" "$build/media/alsa"; do
     headers=$("$readelf" -h "$binary")
     if ! grep -Eq 'Type:[[:space:]]+DYN' <<< "$headers"; then
         echo "Expected static PIE (ELF DYN): $binary" >&2
@@ -94,6 +100,7 @@ if [[ $arch == x86_64-linux-musl && $(uname -m) == x86_64 ]]; then
     ctest --test-dir "$build/imgui" --output-on-failure --parallel 1
     INPUTRC=/dev/null TERM=dumb ctest --test-dir "$build/readline" --output-on-failure
     "$build/glib/glib-smoke"
+    ctest --test-dir "$build/media" --output-on-failure
     "$target/bin/ccache" --version
     echo "Native libc/static-PIE, C, C++20/thread/database and ccache smoke tests passed"
 else
