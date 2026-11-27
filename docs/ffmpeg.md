@@ -134,6 +134,26 @@ specifying the input.
   -frames:v 1 -update 1 artwork.png
 ```
 
+## Read frames into a buffer
+
+In a C or C++ application, send input packets with `avcodec_send_packet()`
+and receive decoded pixels in an `AVFrame` with `avcodec_receive_frame()`.
+Read the planes through `frame->data` and use `frame->linesize` for row strides.
+Keep a frame reference or copy the pixels if they must outlive the frame.
+This path works with the encoder-free profile.
+
+A caller can also capture binary stdout from the CLI. With the PNG encoder
+enabled, this writes one PNG to stdout.
+
+```sh
+"$FF_OUT/bin/ffmpeg" -v error -c:v librsvg -width 2048 -i artwork.svg \
+  -frames:v 1 -c:v png -f image2pipe pipe:1
+```
+
+For unpacked RGBA bytes, use `-c:v rawvideo -pix_fmt rgba -f rawvideo pipe:1`
+with the rawvideo encoder enabled. Raw output has no header, so the caller
+needs the frame dimensions and pixel format.
+
 Provide fonts and Fontconfig configuration for SVG text and subtitles.
 `FONTCONFIG_PATH="$SDK/etc/fonts"` selects the shipped configuration. HTTPS
 uses a CA trust bundle on the target machine. SVG resources such as linked
