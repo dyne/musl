@@ -38,7 +38,7 @@ before making claims about what is currently published.
 | `sources.urls`, `sources.sha256`, `scripts/download.sh` | Exact upstream URLs and integrity checks for new and cached inputs |
 | `scripts/toolchain-state.sh` | Invalidates selected compiler build/install state when inputs change |
 | `scripts/compiler-cache.sh`, `scripts/check-ccache.sh` | GCC/frontend cache identity and real bootstrap C/C++ hit probes |
-| `libs/GNUmakefile`, `libs/media.mk` | Library versions, dependency graph, per-target sources and installation |
+| `libs/GNUmakefile`, `libs/media.mk`, `libs/ffmpeg.mk` | Library versions, dependency graph, per-target sources and installation |
 | `settings.cmake` | Consumer/internal cross-compilation settings |
 | `prepare.sh`, `scripts/smoke.sh`, `tests/` | Package preparation, real C/C++ checks, offline regression suite |
 | `scripts/relocate-metadata.py`, `tests/curl/` | Relocatable pkg-config/CMake metadata and static C++20/libcurl consumers |

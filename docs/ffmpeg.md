@@ -1,164 +1,96 @@
-# Build static FFmpeg with the musl SDK
+# Static FFmpeg with the musl SDK
 
-The SDK provides the static C API for librsvg and its headless dependency
-stack. Use it for SVG rasterisation, and use the profile below for a
-software-only FFmpeg build with common audio and video decoding, subtitle
-rendering, HTTPS, and MPEG-DASH.
+Each target SDK includes FFmpeg **9.1**. It installs static `ffmpeg` and
+`ffprobe` in the target's `bin/` directory. The C headers, static archives,
+and pkg-config files are also included for libavcodec, libavdevice, libavfilter,
+libavformat, libavutil, libswresample, and libswscale. Run the executables on
+the target architecture. The cross-compiler and the host's pkg-config can
+use the development files from the build machine.
 
-## SDK libraries
+## Decoding and rendering
 
-Use the SDK's target prefix as the pkg-config search path. The packaged
-`librsvg-2.0.pc` resolves the static dependency closure, including Cairo with
-PNG and GObject support, Pixman, libpng, PangoCairo, PangoFT2, Fontconfig,
-FriBidi, GLib, FreeType, HarfBuzz, and libxml2. The librsvg recipe disables
-AVIF via dav1d and the GDK-Pixbuf integration.
+| Feature | SDK support |
+| --- | --- |
+| Common video, audio, and image formats | Native FFmpeg decoders, including H.264, HEVC, ProRes, MPEG, AAC, FLAC, Opus, JPEG, and WebP |
+| AV1, VP8/VP9, JPEG XL | dav1d, libvpx, libjxl, and libjxl_threads |
+| SVG | librsvg, Cairo with PNG and GObject, Pixman, libpng, PangoCairo, PangoFT2, Fontconfig, FriBidi, GLib, FreeType, HarfBuzz, and libxml2 |
+| Subtitles and text | libass, FreeType, HarfBuzz, Fontconfig, and FriBidi |
+| Scaling and colour conversion | libswscale and zimg (`zscale`) |
+| Local files and network inputs | FFmpeg demuxers, GnuTLS for HTTPS, and libxml2 for MPEG-DASH and IMF |
+| Compression and character conversion | zlib, bzip2, liblzma, and musl iconv |
 
-For ALSA applications, use `pkg-config --static --cflags --libs alsa`.
-The library supports built-in PCM plugins. External shared plugins need a
-dynamic build. Set `ALSA_CONFIG_DIR="$SDK/share/alsa"` to use the SDK's
-configuration on a system without ALSA data installed.
+The SDK builds FFmpeg with software decoding and disables hardware
+accelerators, FFplay, frei0r, and device inputs and outputs. It enables five
+native encoders for exporting decoded data and running decode tests:
+`rawvideo`, `wrapped_avframe`, `pcm_s16le`, `pcm_f32le`, and `png`.
+For WebM with alpha, select `-c:v libvpx` or `-c:v libvpx-vp9` before the input
+so FFmpeg decodes its alpha stream. librsvg builds without GDK-Pixbuf or
+its optional dav1d-backed AVIF support. FFmpeg uses dav1d directly for AV1 video.
+The JPEG XL libraries also link statically to Highway, Brotli, and Little CMS.
 
-For stack traces, include `<execinfo.h>` and link `-lexecinfo` or use
-`pkg-config --static --cflags --libs execinfo`. Build the code you want to
-trace with `-funwind-tables`. The SDK's static provider reports addresses.
-Keep debug information and record the load address for symbolisation of
-static PIE executables.
+## Write a frame to a buffer
 
-## FFmpeg dependencies
-
-Build the external libraries for the same musl target as the SDK. Keep
-their installed headers, archives, and pkg-config metadata in a separate
-prefix when convenient.
-
-| Feature | External package | FFmpeg switch |
-| --- | --- | --- |
-| AV1 | dav1d | `--enable-libdav1d` |
-| VP8/VP9 with WebM alpha | libvpx | `--enable-libvpx` |
-| JPEG XL | libjxl, libjxl_threads | `--enable-libjxl` |
-| Subtitles | libass | `--enable-libass` |
-| zscale | zimg | `--enable-libzimg` |
-| Additional image and container compression | bzip2, liblzma | `--enable-bzlib --enable-lzma` |
-
-The recipe also enables SDK libraries for SVG, text, HTTPS, XML, and zlib,
-plus iconv from musl. FFmpeg's native decoders handle H.264, HEVC, MPEG,
-ProRes, DNxHD, FFV1, common audio codecs, and formats such as JPEG, TIFF,
-WebP, and JPEG 2000. When decoding WebM with transparency, explicitly select
-`libvpx` for VP8 or `libvpx-vp9` for VP9 before specifying the input.
-
-## Configure and build
-
-Start in a clean FFmpeg release source tree. Install GNU Make and pkg-config
-on the build host. Use NASM for x86 assembly optimisations. Adjust the target,
-FFmpeg architecture, and prefix paths for your build.
+Read SVG bytes on standard input and capture one 32 × 32 RGBA frame from
+standard output. A complete frame occupies 4,096 bytes.
 
 ```sh
-TARGET=x86_64-linux-musl
-FF_ARCH=x86_64
-FF_CROSS="/opt/dyne/gcc-musl/bin/$TARGET-"
-SDK="/opt/dyne/$TARGET"
-FF_DEPS="/opt/ffmpeg-deps/$TARGET"
-FF_SOURCE="$PWD"
-FF_OUT="$FF_SOURCE/install-musl"
-FF_PKG_CONFIG="$(command -v pkg-config)"
+svg_size=$(wc -c < artwork.svg)
+"$SDK/bin/ffmpeg" -v error -f svg_pipe -frame_size "$svg_size" \
+  -c:v librsvg -width 32 -height 32 \
+  -i pipe:0 -frames:v 1 -pix_fmt rgba -f rawvideo pipe:1 < artwork.svg
+```
 
-export PKG_CONFIG_PATH=''
-export PKG_CONFIG_LIBDIR="$SDK/lib/pkgconfig:$SDK/share/pkgconfig:$FF_DEPS/lib/pkgconfig:$FF_DEPS/lib64/pkgconfig:$FF_DEPS/share/pkgconfig"
+For a single PNG buffer, replace `-pix_fmt rgba -f rawvideo` with
+`-c:v png -f image2pipe`. Capture the child's stdout as bytes and use
+its exit status to check that decoding succeeded. To probe a file, run
+`"$SDK/bin/ffprobe" -v error -show_streams input.mp4`.
+
+## Link an application
+
+For a target such as `x86_64-linux-musl`, set `SDK` to the extracted
+`dyne/x86_64-linux-musl` directory. Restrict pkg-config to the target's
+relocatable metadata before cross-compiling.
+
+```sh
+export PKG_CONFIG_PATH=
+export PKG_CONFIG_LIBDIR="$SDK/lib/pkgconfig"
 unset PKG_CONFIG_SYSROOT_DIR
 
-"$FF_PKG_CONFIG" --static --exists \
-  dav1d vpx libjxl libjxl_threads librsvg-2.0 \
-  libass freetype2 harfbuzz fontconfig fribidi zimg gnutls libxml-2.0 zlib liblzma
-"$FF_PKG_CONFIG" --static --cflags --libs librsvg-2.0
-
-mkdir "$FF_SOURCE/build-musl"
-cd "$FF_SOURCE/build-musl"
-"$FF_SOURCE/configure" \
-  --prefix="$FF_OUT" --target-os=linux --arch="$FF_ARCH" \
-  --enable-cross-compile --cross-prefix="$FF_CROSS" \
-  --cc="${FF_CROSS}gcc" --cxx="${FF_CROSS}g++" \
-  --pkg-config="$FF_PKG_CONFIG" --pkg-config-flags=--static \
-  --extra-cflags="-I$SDK/include -I$FF_DEPS/include" \
-  --extra-cxxflags="-I$SDK/include -I$FF_DEPS/include" \
-  --extra-ldflags="-static -L$SDK/lib -L$FF_DEPS/lib -L$FF_DEPS/lib64" \
-  --extra-libs="-lstdc++ -lm" \
-  --enable-static --disable-shared --disable-autodetect --enable-pthreads \
-  --disable-ffplay --disable-encoders --disable-debug --disable-doc \
-  --enable-libdav1d --enable-libvpx --enable-libjxl --enable-librsvg \
-  --enable-libass --enable-libfreetype --enable-libharfbuzz --enable-libfontconfig \
-  --enable-libfribidi --enable-libzimg --enable-gnutls --enable-libxml2 \
-  --enable-zlib --enable-bzlib --enable-lzma --enable-iconv
-make -j"$(getconf _NPROCESSORS_ONLN)"
-make install
+pkg-config --static --modversion libavcodec libavformat libswscale
+"$SDK/../gcc-musl/bin/x86_64-linux-musl-gcc" -static player.c \
+  $(pkg-config --static --cflags --libs libavformat libavcodec libavutil libswscale) \
+  -o player
 ```
 
-The compiler uses its own libc sysroot. Leave the SDK and dependency prefixes
-as include, library and pkg-config paths. The SDK metadata resolves paths
-relative to its location. External metadata can use its installed absolute
-prefix or its own relocatable paths. Keep `PKG_CONFIG_LIBDIR` limited to
-target metadata so configure cannot pick up host libraries.
+On ARM hard-float, link FFmpeg consumers with `-static`. The toolchain's
+`libatomic.a` fallback lock code is incompatible with static PIE.
 
-`--enable-static --disable-shared` controls FFmpeg's library outputs.
-`--extra-ldflags=-static` controls executable linkage, and
-`--pkg-config-flags=--static` requests private static dependency flags.
-If a configure check fails, inspect `build-musl/ffbuild/config.log` for the
-original link error and check the archives named by pkg-config.
+For in-process decoding, send a refcounted `AVPacket` to
+`avcodec_send_packet()` and receive an `AVFrame` from
+`avcodec_receive_frame()`. Read the planes using `frame->data` and
+`frame->linesize`. Use libswscale when you need a particular pixel format
+or want to copy into a tightly packed destination buffer.
 
-## Verify executables and optionally export frames
+Fonts and Fontconfig configuration are runtime resources for SVG text and
+subtitle rendering. Applications verifying HTTPS certificates also need a
+CA trust bundle. Set `FONTCONFIG_FILE="$SDK/etc/fonts/fonts.conf"` to use the
+SDK's Fontconfig configuration.
 
-Each executable should have no `INTERP` program header or `NEEDED` entries.
-Run the decoder and input checks on a compatible target.
+## Related SDK libraries
 
-```sh
-for bin in ffmpeg ffprobe; do
-  "${FF_CROSS}readelf" -l -d "$FF_OUT/bin/$bin"
-done
-"$FF_OUT/bin/ffmpeg" -hide_banner -h decoder=librsvg
-"$FF_OUT/bin/ffmpeg" -hide_banner -h decoder=libdav1d
-"$FF_OUT/bin/ffmpeg" -filters
-"$FF_OUT/bin/ffmpeg" -encoders
-"$FF_OUT/bin/ffprobe" -v error -show_streams input.mp4
-```
+Use `pkg-config --static --cflags --libs librsvg-2.0` to link
+librsvg directly. For ALSA applications, link with
+`pkg-config --static --cflags --libs alsa`. Set
+`ALSA_CONFIG_DIR="$SDK/share/alsa"` to use the SDK's configuration.
+Static ALSA supports built-in PCM plugins.
 
-The strict profile keeps all FFmpeg encoders disabled. To export decoded
-frames or PCM with the CLI, add these flags after `--disable-encoders`.
+For stack traces, include `<execinfo.h>` and link with
+`pkg-config --static --cflags --libs execinfo`. Compile the code you want to
+trace with `-funwind-tables`. The static provider reports addresses.
+Keep debug information and record the load address to symbolise static PIE
+executables.
 
-```sh
---enable-encoder=rawvideo,wrapped_avframe,pcm_s16le,pcm_f32le,png
-```
-
-With PNG enabled, select the SVG decoder and rasterisation width before
-specifying the input.
-
-```sh
-"$FF_OUT/bin/ffmpeg" -c:v librsvg -width 2048 -i artwork.svg \
-  -frames:v 1 -update 1 artwork.png
-```
-
-## Read frames into a buffer
-
-In a C or C++ application, send input packets with `avcodec_send_packet()`
-and receive decoded pixels in an `AVFrame` with `avcodec_receive_frame()`.
-Read the planes through `frame->data` and use `frame->linesize` for row strides.
-Keep a frame reference or copy the pixels if they must outlive the frame.
-This path works with the encoder-free profile.
-
-A caller can also capture binary stdout from the CLI. With the PNG encoder
-enabled, this writes one PNG to stdout.
-
-```sh
-"$FF_OUT/bin/ffmpeg" -v error -c:v librsvg -width 2048 -i artwork.svg \
-  -frames:v 1 -c:v png -f image2pipe pipe:1
-```
-
-For unpacked RGBA bytes, use `-c:v rawvideo -pix_fmt rgba -f rawvideo pipe:1`
-with the rawvideo encoder enabled. Raw output has no header, so the caller
-needs the frame dimensions and pixel format.
-
-Provide fonts and Fontconfig configuration for SVG text and subtitles.
-`FONTCONFIG_PATH="$SDK/etc/fonts"` selects the shipped configuration. HTTPS
-uses a CA trust bundle on the target machine. SVG resources such as linked
-images must also be available to the rasteriser.
-
-See the [FFmpeg configure source](https://github.com/FFmpeg/FFmpeg/blob/master/configure),
-[codec documentation](https://ffmpeg.org/ffmpeg-codecs.html), and
-[librsvg build guide](https://gnome.pages.gitlab.gnome.org/librsvg/devel-docs/compiling.html).
+To rebuild the packaged profile, run `make prepare ARCH=<tuple>` in the
+musl repository. The source pins and configuration are in `libs/ffmpeg.mk`.
+`make smoke ARCH=<tuple>` checks static linkage and, on native x86_64, decodes
+SVG into an `AVFrame` and checks raw RGBA and PNG on stdout.

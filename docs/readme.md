@@ -113,9 +113,10 @@ Pass that path to `magic_load()` or set the application's `MAGIC` environment
 variable to use it with `magic_load(cookie, NULL)`. The library uses the SDK's
 zlib for gzip input.
 
-The [headless SVG and FFmpeg profile](ffmpeg.md) includes static librsvg,
-Cairo with PNG and GObject support, Pixman, libpng, Pango with PangoCairo and
-PangoFT2, Fontconfig, FriBidi, and libxml2. The SDK also includes ALSA and
+The [static FFmpeg profile](ffmpeg.md) includes FFmpeg **9.1**, with
+`ffmpeg` and `ffprobe` executables, C headers, static archives, and pkg-config
+files. It supports AV1, transparent VP8/VP9 WebM, JPEG XL, subtitle rendering,
+HTTPS, MPEG-DASH, and headless SVG. The SDK also includes ALSA and
 `<execinfo.h>` with `libexecinfo.a` for stack traces.
 
 GLib **2.90.1** includes static GLib, GObject, GIO, GModule and GThread

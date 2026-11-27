@@ -67,7 +67,8 @@ for binary in "$build/toolchain" "$build/static-pie" "$build/static-and-pie" \
     "$build/curl/curl-pkgconfig" "$build/curl/curl-config" \
     "$build/imgui/imgui" "$build/imgui/imgui-pkgconfig" \
     "$build/readline/readline" "$build/readline/history" "$build/glib/glib-smoke" \
-    "$build/media/svg" "$build/media/execinfo" "$build/media/alsa" "$target/bin/ccache"; do
+    "$build/media/svg" "$build/media/execinfo" "$build/media/alsa" "$build/media/ffmpeg-api" \
+    "$target/bin/ffmpeg" "$target/bin/ffprobe" "$target/bin/ccache"; do
     headers=$("$readelf" -h -l -d "$binary")
     if ! grep -q "$machine" <<< "$headers"; then
         echo "Unexpected ELF machine for $arch: $binary" >&2
